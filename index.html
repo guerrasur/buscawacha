@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.1.10">
+  <link rel="stylesheet" href="styles.css?v=0.2.0">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.1.10</span>
+        <span id="versionLabel">v0.2.0</span>
       </div>
       <div class="topbar-actions">
         <button id="devToggleButton" class="dev-toggle" type="button" aria-expanded="false" aria-controls="devPanel">DEV</button>
@@ -42,10 +42,24 @@
         <p class="lead">Completá un tablero para descender. Pisá una mina sin escudos y la run termina.</p>
         <div id="homeStats" class="stats"></div>
         <button id="startButton" class="primary" type="button">Nueva run</button>
+        <button id="traverseButton" class="secondary mode-button" type="button">Travesía (prototipo)</button>
         <details class="howto">
           <summary>Cómo jugar</summary>
           <p>Tocá una casilla para revelarla. Mantenela apretada para poner o sacar una bandera. El primer toque nunca contiene una mina.</p>
         </details>
+      </section>
+
+      <section id="traverseScreen" class="screen hidden" aria-live="polite">
+        <h1>Travesía</h1>
+        <p class="lead">Llegá desde la fila inferior hasta la fila superior.</p>
+        <p id="traverseStatus" class="traverse-status">Llegá a la fila superior.</p>
+        <div class="traverse-board-wrap">
+          <div id="traverseBoard" class="traverse-board" role="grid" aria-label="Tablero de Travesía"></div>
+        </div>
+        <div class="traverse-controls">
+          <button id="restartTraverseButton" class="secondary" type="button">Reiniciar</button>
+          <button id="traverseHomeButton" class="ghost" type="button">Volver al menú</button>
+        </div>
       </section>
 
       <section id="gameScreen" class="screen hidden" aria-live="polite">
@@ -95,6 +109,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.1.10"></script>
+  <script src="game.js?v=0.2.0"></script>
 </body>
 </html>

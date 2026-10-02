@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.1.10**.
+Versión base: **v0.2.0**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -57,6 +57,22 @@ Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidade
 - Si el jugador está en 0 escudos, la tirada de recompensa se sesga hacia +1 escudo, pero NO lo garantiza: todavía pueden salir +1 espacio de escudo u otros objetos.
 - Recompensa consumible actual: `?` (pista). Se puede acumular. Los ítems consumibles se muestran centrados debajo del mapa, sin texto, sólo con su icono y contador. `?` se arrastra sobre una casilla sin revelar; esa primera casilla queda marcada y se resaltan sólo las casillas contiguas válidas para elegir la segunda. Consume 1 unidad e informa cuáles de esas dos tienen mina.
 - La información mostrada al elegir descenso es orientativa; el tablero real se genera al entrar.
+
+## Travesía (prototipo)
+
+Modo experimental separado del Buscaminas clásico. No reutilizar sus reglas para cambiar el modo principal.
+
+- Tablero rectangular configurable mediante `TRAVERSE_COLS`, `TRAVERSE_ROWS` y `TRAVERSE_MINES`.
+- Valores iniciales: 10 × 12, 18 minas.
+- Se empieza en el centro de la fila inferior; toda esa fila queda libre de minas.
+- El objetivo es llegar a cualquier casilla de la fila superior.
+- Movimiento ortogonal de una casilla por turno, por toque/clic adyacente o flechas del teclado.
+- Sólo se revela la casilla que el jugador pisa; no hay expansión de ceros, banderas, objetos ni temporizador.
+- Las casillas visitadas conservan el número de minas en sus 8 vecinas.
+- La generación verifica que exista al menos un camino libre hasta arriba y regenera si hace falta.
+- Entrar en una mina termina la partida y muestra todas las minas.
+- Este modo no modifica perfil, ecos, desbloqueos ni progreso del modo clásico.
+- Mantenerlo deliberadamente sin estética, animaciones ni audio mientras se prueba la mecánica.
 
 ## Modo developer
 

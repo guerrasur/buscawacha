@@ -1,10 +1,14 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.10';
+  const VERSION = '0.2.0';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const DEV_KEY = 'buscawacha-dev-mode-v1';
   const LONG_PRESS_MS = 430;
+  const TRAVERSE_COLS = 10;
+  const TRAVERSE_ROWS = 12;
+  const TRAVERSE_MINES = 18;
+  const TRAVERSE_GENERATION_ATTEMPTS = 500;
   const FLOOR_TYPES = {
     safe: { id: 'safe', name: 'Piso seguro', rewardChance: 0.10, rewardQuality: 'Baja', densityDelta: -0.035, cellDelta: 5, mineDamage: 1 },
     normal: { id: 'normal', name: 'Piso normal', rewardChance: 0.40, rewardQuality: 'Normal', densityDelta: 0, cellDelta: 0, mineDamage: 1 },
@@ -20,11 +24,12 @@
   ];
 
   const $ = (s) => document.querySelector(s);
-  const screens = ['#homeScreen', '#gameScreen', '#choiceScreen', '#deathScreen'];
+  const screens = ['#homeScreen', '#traverseScreen', '#gameScreen', '#choiceScreen', '#deathScreen'];
   const profile = loadProfile();
 
   let run = null;
   let board = null;
+  let traverse = null;
   let pendingChoices = [];
   let latestVersion = VERSION;
   let longPressTimer = null;
@@ -165,6 +170,200 @@
       ['Ecos', profile.echoes],
       ['Formas', `${unlocked}/${SHAPE_UNLOCKS.length}`]
     ].map(([label, value]) => `<div class="stat"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  }
+
+
+  function startTraverse() {
+    run = null;
+    board = null;
+    traverse = createTraverseState();
+    showScreen('#traverseScreen');
+    renderTraverse();
+  }
+
+  function createTraverseState() {
+    const rows = TRAVERSE_ROWS;
+    const cols = TRAVERSE_COLS;
+    const mineCount = TRAVERSE_MINES;
+    const start = { r: rows - 1, c: Math.floor(cols / 2) };
+    const mines = generateTraverseMines(rows, cols, mineCount, start);
+    return {
+      rows,
+      cols,
+      mineCount,
+      mines,
+      visited: new Set([keyOf(start.r, start.c)]),
+      current: start,
+      ended: false,
+      won: false,
+      revealMines: false
+    };
+  }
+
+  function generateTraverseMines(rows, cols, mineCount, start) {
+    const candidates = [];
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols; c++) candidates.push(keyOf(r, c));
+    }
+
+    const minimumPathCellsOutsideStartRow = rows - 1;
+    const maxMinesWithPath = candidates.length - minimumPathCellsOutsideStartRow;
+    if (mineCount < 0 || mineCount > maxMinesWithPath) {
+      throw new Error('TRAVERSE_MINES no permite garantizar un camino libre.');
+    }
+
+    for (let attempt = 0; attempt < TRAVERSE_GENERATION_ATTEMPTS; attempt++) {
+      const mines = new Set(shuffle(candidates).slice(0, mineCount));
+      if (hasTraversePath(rows, cols, mines, start)) return mines;
+    }
+
+    const guaranteedPath = makeGuaranteedTraversePath(rows, cols, start);
+    const fallbackPool = candidates.filter(key => !guaranteedPath.has(key));
+    return new Set(shuffle(fallbackPool).slice(0, mineCount));
+  }
+
+  function makeGuaranteedTraversePath(rows, cols, start) {
+    const path = new Set([keyOf(start.r, start.c)]);
+    let r = start.r;
+    let c = start.c;
+
+    while (r > 0) {
+      if (Math.random() < 0.35) {
+        const directions = shuffle([-1, 1]);
+        const dc = directions.find(delta => c + delta >= 0 && c + delta < cols);
+        if (dc) {
+          c += dc;
+          path.add(keyOf(r, c));
+        }
+      }
+      r -= 1;
+      path.add(keyOf(r, c));
+    }
+    return path;
+  }
+
+  function hasTraversePath(rows, cols, mines, start) {
+    const startKey = keyOf(start.r, start.c);
+    if (mines.has(startKey)) return false;
+
+    const queue = [start];
+    const seen = new Set([startKey]);
+    while (queue.length) {
+      const current = queue.shift();
+      if (current.r === 0) return true;
+
+      neighbors4(current.r, current.c).forEach(([r, c]) => {
+        if (r < 0 || c < 0 || r >= rows || c >= cols) return;
+        const key = keyOf(r, c);
+        if (mines.has(key) || seen.has(key)) return;
+        seen.add(key);
+        queue.push({ r, c });
+      });
+    }
+    return false;
+  }
+
+  function traverseNumberAt(r, c) {
+    let count = 0;
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        if (traverse.mines.has(keyOf(r + dr, c + dc))) count += 1;
+      }
+    }
+    return count;
+  }
+
+  function renderTraverse() {
+    if (!traverse) return;
+    const root = $('#traverseBoard');
+    root.style.setProperty('--cols', traverse.cols);
+    root.style.setProperty('--rows', traverse.rows);
+    root.innerHTML = '';
+
+    for (let r = 0; r < traverse.rows; r++) {
+      for (let c = 0; c < traverse.cols; c++) {
+        const key = keyOf(r, c);
+        const isMine = traverse.mines.has(key);
+        const visited = traverse.visited.has(key);
+        const current = traverse.current.r === r && traverse.current.c === c;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'traverse-cell';
+        btn.dataset.r = r;
+        btn.dataset.c = c;
+
+        if (visited) btn.classList.add('visited');
+        if (current) btn.classList.add('current');
+
+        if (traverse.revealMines && isMine) {
+          btn.classList.add('mine');
+          btn.textContent = '✹';
+          btn.setAttribute('aria-label', 'Mina');
+        } else if (visited && !isMine) {
+          const number = traverseNumberAt(r, c);
+          if (number > 0) btn.textContent = number;
+          btn.setAttribute('aria-label', number > 0 ? `${number} minas alrededor` : 'Vacía');
+        } else {
+          btn.setAttribute('aria-label', 'Casilla sin visitar');
+        }
+
+        btn.addEventListener('click', () => moveTraverseTo(r, c));
+        root.appendChild(btn);
+      }
+    }
+
+    const status = $('#traverseStatus');
+    if (traverse.ended) {
+      status.textContent = traverse.won
+        ? 'Victoria: llegaste a la fila superior.'
+        : 'Derrota: pisaste una mina.';
+    } else {
+      status.textContent = 'Llegá a la fila superior.';
+    }
+  }
+
+  function moveTraverseTo(r, c) {
+    if (!traverse || traverse.ended) return;
+    const distance = Math.abs(r - traverse.current.r) + Math.abs(c - traverse.current.c);
+    if (distance !== 1 || r < 0 || c < 0 || r >= traverse.rows || c >= traverse.cols) return;
+
+    const key = keyOf(r, c);
+    traverse.current = { r, c };
+    traverse.visited.add(key);
+
+    if (traverse.mines.has(key)) {
+      traverse.ended = true;
+      traverse.revealMines = true;
+      renderTraverse();
+      return;
+    }
+
+    if (r === 0) {
+      traverse.ended = true;
+      traverse.won = true;
+    }
+    renderTraverse();
+  }
+
+  function handleTraverseKeydown(event) {
+    if (!traverse || traverse.ended || $('#traverseScreen').classList.contains('hidden')) return;
+    const directions = {
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1]
+    };
+    const direction = directions[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    moveTraverseTo(traverse.current.r + direction[0], traverse.current.c + direction[1]);
+  }
+
+  function leaveTraverse() {
+    traverse = null;
+    renderHome();
+    showScreen('#homeScreen');
   }
 
   function startRun() {
@@ -877,6 +1076,9 @@
   }
 
   $('#startButton').addEventListener('click', startRun);
+  $('#traverseButton').addEventListener('click', startTraverse);
+  $('#restartTraverseButton').addEventListener('click', startTraverse);
+  $('#traverseHomeButton').addEventListener('click', leaveTraverse);
   $('#retryButton').addEventListener('click', () => {
     $('#deathScreen h2').textContent = 'Encontraste una mina.';
     startRun();
@@ -893,6 +1095,7 @@
   });
   $('#clueItem').addEventListener('pointerdown', beginClueDrag);
   window.addEventListener('focus', checkForUpdate);
+  window.addEventListener('keydown', handleTraverseKeydown);
   setInterval(checkForUpdate, 60000);
 
   $('#versionLabel').textContent = `v${VERSION}`;
