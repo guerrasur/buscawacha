@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.1.2**.
+Versión base: **v0.1.6**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -50,8 +50,11 @@ Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidade
 - Las formas pueden variar proceduralmente, pero nunca deben generar grupos desconectados involuntariamente.
 - La dificultad puede crecer mediante cantidad de casillas, densidad de minas y geometría.
 - No subir necesariamente las tres variables al mismo tiempo.
-- La pantalla entre pisos ofrece dos descensos con información breve: forma, rasgo, casillas aproximadas y minas aproximadas.
-- La información mostrada es orientativa; el tablero real se genera al entrar.
+- La pantalla entre pisos ofrece dos descensos; no tienen que aparecer siempre todos los tipos de piso disponibles.
+- Tipos actuales: Seguro (menos minas, 10% recompensa, calidad baja), Normal (40%, calidad normal), Peligroso (más minas, 100%, calidad normal) y Pesado (cada mina consume 2 escudos, 65%, calidad alta).
+- El primer piso mantiene una mejora garantizada de +1 escudo.
+- Desde el segundo piso, la recompensa depende del tipo de piso completado.
+- La información mostrada al elegir descenso es orientativa; el tablero real se genera al entrar.
 
 ## Mobile-first
 
