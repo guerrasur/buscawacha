@@ -684,7 +684,7 @@
           continue;
         }
 
-        if (isTraverseFrontier(key) && !revealed && !mine) btn.classList.add('frontier');
+        if (isTraverseFrontier(key) && !revealed) btn.classList.add('frontier');
 
         if (traverse.revealMines && mine) {
           btn.classList.add('mine');
