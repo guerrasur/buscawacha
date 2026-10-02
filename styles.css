@@ -88,6 +88,61 @@ p { line-height: 1.35; }
 .runbar span { display: block; font-size: 9px; font-weight: 700; }
 .runbar strong { display: block; margin-top: 1px; font-family: monospace; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+
+.item-bar {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -1px 0 7px;
+  padding: 4px 6px;
+  border: 1px solid #999;
+  background: #e2e2e2;
+}
+.item-label { font-size: 9px; font-weight: 700; }
+.item-help { font-size: 10px; color: #444; }
+.clue-item {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #000;
+  background: #f5f5f5;
+  font-family: monospace;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: grab;
+  touch-action: none;
+}
+.clue-item:active { cursor: grabbing; }
+.clue-item small {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-family: monospace;
+  font-size: 9px;
+  line-height: 1;
+}
+.clue-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border: 2px solid #000;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 24px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.cell.clue-first { outline: 3px solid #000; outline-offset: -3px; }
+.cell.clue-known-mine { background: #444; color: #fff; }
+.cell.clue-known-safe { background: #f7f7f7; color: #222; }
+
 .board-wrap {
   width: 100%;
   display: flex;
