@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.1.9">
+  <link rel="stylesheet" href="styles.css?v=0.1.10">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.1.9</span>
+        <span id="versionLabel">v0.1.10</span>
       </div>
       <div class="topbar-actions">
         <button id="devToggleButton" class="dev-toggle" type="button" aria-expanded="false" aria-controls="devPanel">DEV</button>
@@ -57,16 +57,14 @@
           <div><span>ESCUDOS</span><strong id="shieldLabel">0/1</strong></div>
         </div>
 
-        <div id="itemBar" class="item-bar hidden" aria-label="Objetos">
-          <span class="item-label">OBJETO</span>
-          <button id="clueItem" class="clue-item" type="button" aria-label="Arrastrar pista">
-            ?<small id="clueCount">0</small>
-          </button>
-          <span class="item-help">Arrastrá ? a una casilla</span>
-        </div>
-
         <div id="boardWrap" class="board-wrap">
           <div id="board" class="board" role="grid" aria-label="Tablero de Buscaminas"></div>
+        </div>
+
+        <div id="itemBar" class="item-bar hidden" aria-label="Objetos">
+          <button id="clueItem" class="item-slot clue-item" type="button" aria-label="Arrastrar pista">
+            ?<small id="clueCount">0</small>
+          </button>
         </div>
 
         <div class="controls">
@@ -97,6 +95,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.1.9"></script>
+  <script src="game.js?v=0.1.10"></script>
 </body>
 </html>
