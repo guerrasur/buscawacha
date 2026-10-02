@@ -1,8 +1,9 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.8';
+  const VERSION = '0.1.9';
   const PROFILE_KEY = 'buscawacha-profile-v1';
+  const DEV_KEY = 'buscawacha-dev-mode-v1';
   const LONG_PRESS_MS = 430;
   const FLOOR_TYPES = {
     safe: { id: 'safe', name: 'Piso seguro', rewardChance: 0.10, rewardQuality: 'Baja', densityDelta: -0.035, cellDelta: 5, mineDamage: 1 },
@@ -30,6 +31,8 @@
   let longPressTriggered = false;
   let clueSelection = null;
   let clueDrag = null;
+  let devMode = false;
+  let devPeek = false;
 
   function loadProfile() {
     try {
@@ -56,7 +59,101 @@
 
   function showScreen(selector) {
     screens.forEach(s => $(s).classList.toggle('hidden', s !== selector));
+    updateDevStatus();
     window.scrollTo(0, 0);
+  }
+
+  function loadDevMode() {
+    try { return localStorage.getItem(DEV_KEY) === '1'; } catch { return false; }
+  }
+
+  function setDevMode(enabled) {
+    devMode = Boolean(enabled);
+    try { localStorage.setItem(DEV_KEY, devMode ? '1' : '0'); } catch {}
+    const panel = $('#devPanel');
+    const button = $('#devToggleButton');
+    if (panel) panel.classList.toggle('hidden', !devMode);
+    if (button) {
+      button.textContent = devMode ? 'JUGADOR' : 'DEV';
+      button.setAttribute('aria-expanded', devMode ? 'true' : 'false');
+      button.classList.toggle('active', devMode);
+    }
+    updateDevStatus();
+  }
+
+  function updateDevStatus(message = '') {
+    const status = $('#devStatus');
+    if (!status) return;
+    if (message) {
+      status.textContent = message;
+      return;
+    }
+    status.textContent = run
+      ? `Piso ${run.floor} · ? ${run.clues} · escudos ${run.shields}/${run.shieldCapacity}`
+      : 'Sin run activa';
+  }
+
+  function handleDevAction(action) {
+    if (!devMode) return;
+    if (!run) {
+      updateDevStatus('Iniciá una run primero');
+      return;
+    }
+
+    if (action === 'clue') {
+      run.clues += 1;
+      updateClueUI();
+      updateDevStatus('+1 objeto ?');
+      return;
+    }
+
+    if (action === 'shield') {
+      if (run.shields >= run.shieldCapacity) {
+        updateDevStatus('Escudos al máximo');
+        return;
+      }
+      run.shields += 1;
+      updateShieldLabel();
+      updateDevStatus('+1 escudo');
+      return;
+    }
+
+    if (action === 'capacity') {
+      run.shieldCapacity += 1;
+      updateShieldLabel();
+      updateDevStatus('+1 espacio');
+      return;
+    }
+
+    if (action === 'remove-shield') {
+      run.shields = Math.max(0, run.shields - 1);
+      updateShieldLabel();
+      updateDevStatus('−1 escudo');
+      return;
+    }
+
+    if (action === 'complete') {
+      if (!board || board.ended) {
+        updateDevStatus('No hay piso activo');
+        return;
+      }
+      completeFloor();
+      updateDevStatus('Piso completado');
+      return;
+    }
+
+    if (action === 'peek') {
+      if (!board || !board.minesPlaced) {
+        updateDevStatus('Tocá una casilla primero');
+        return;
+      }
+      devPeek = !devPeek;
+      document.querySelectorAll('.cell').forEach(button => {
+        const cell = board.cells.find(c => c.key === button.dataset.key);
+        button.classList.toggle('dev-mine', Boolean(devPeek && cell?.active && cell.mine && !cell.revealed));
+      });
+      updateDevStatus(devPeek ? 'Minas visibles' : 'Minas ocultas');
+    }
   }
 
   function renderHome() {
@@ -118,6 +215,7 @@
   }
 
   function startFloor(spec) {
+    devPeek = false;
     showScreen('#gameScreen');
     profile.bestFloor = Math.max(profile.bestFloor, spec.floor);
     saveProfile();
@@ -496,6 +594,7 @@
   function updateShieldLabel() {
     const label = $('#shieldLabel');
     if (label) label.textContent = run ? `${run.shields}/${run.shieldCapacity}` : '0/1';
+    updateDevStatus();
   }
 
   function rollFloorReward() {
@@ -748,11 +847,17 @@
   $('#claimShieldButton').addEventListener('click', claimFloorReward);
   $('#skipShieldButton').addEventListener('click', skipFloorReward);
   $('#updateButton').addEventListener('click', installLatestVersion);
+  $('#devToggleButton').addEventListener('click', () => setDevMode(!devMode));
+  $('#devPanel').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-dev-action]');
+    if (button) handleDevAction(button.dataset.devAction);
+  });
   $('#clueItem').addEventListener('pointerdown', beginClueDrag);
   window.addEventListener('focus', checkForUpdate);
   setInterval(checkForUpdate, 60000);
 
   $('#versionLabel').textContent = `v${VERSION}`;
+  setDevMode(loadDevMode());
   renderHome();
   checkForUpdate();
 })();
