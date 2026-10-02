@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.1.1">
+  <link rel="stylesheet" href="styles.css?v=0.1.2">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.1.1</span>
+        <span id="versionLabel">v0.1.2</span>
       </div>
       <button id="updateButton" class="update-button hidden" type="button">Actualizar</button>
     </header>
@@ -26,7 +26,7 @@
         <button id="startButton" class="primary" type="button">Nueva run</button>
         <details class="howto">
           <summary>Cómo jugar</summary>
-          <p>Toque: revelar. Activá <b>Bandera</b> para marcar minas. También podés mantener presionada una casilla. El primer toque nunca contiene una mina.</p>
+          <p>Tocá una casilla para revelarla. Mantenela apretada para poner o sacar una bandera. El primer toque nunca contiene una mina.</p>
         </details>
       </section>
 
@@ -42,10 +42,9 @@
         </div>
 
         <div class="controls">
-          <button id="modeButton" type="button" class="secondary">Modo: revelar</button>
-          <button id="restartRunButton" type="button" class="ghost">Abandonar run</button>
+          <button id="restartRunButton" type="button">Abandonar run</button>
         </div>
-        <p id="gameHint" class="hint">Revelá todas las casillas que no tengan minas.</p>
+        <p id="gameHint" class="hint">Toque: revelar · Mantener: bandera</p>
       </section>
 
       <section id="choiceScreen" class="screen hidden">
@@ -64,6 +63,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.1.1"></script>
+  <script src="game.js?v=0.1.2"></script>
 </body>
 </html>
