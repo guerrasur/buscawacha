@@ -296,11 +296,48 @@ p { line-height: 1.35; }
 
 .mode-button { margin-top: 6px; }
 
-.traverse-status {
-  min-height: 19px;
-  margin: 0 0 7px;
-  font-size: 13px;
+.traverse-meta {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border: 1px solid #777;
+  margin-bottom: 7px;
+  background: #ddd;
+}
+.traverse-meta > div {
+  min-width: 0;
+  padding: 4px 3px;
+  border-right: 1px solid #999;
+  text-align: center;
+}
+.traverse-meta > div:last-child { border-right: 0; }
+.traverse-meta span {
+  display: block;
+  font-size: 8px;
   font-weight: 700;
+}
+.traverse-meta strong {
+  display: block;
+  margin-top: 1px;
+  font-family: monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.traverse-status {
+  min-height: 18px;
+  margin: 0 0 2px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.traverse-detector {
+  min-height: 16px;
+  margin: 0 0 6px;
+  text-align: center;
+  font-family: monospace;
+  font-size: 11px;
 }
 
 .traverse-board-wrap {
@@ -311,42 +348,152 @@ p { line-height: 1.35; }
 }
 
 .traverse-board {
-  --cols: 10;
-  --rows: 12;
-  --cell: min(40px, calc((100vw - 24px) / var(--cols)), calc((100svh - 205px) / var(--rows)));
+  --cols: 11;
+  --rows: 13;
+  --cell: min(38px, calc((100vw - 24px) / var(--cols)), calc((100svh - 270px) / var(--rows)));
   display: grid;
   grid-template-columns: repeat(var(--cols), var(--cell));
   grid-auto-rows: var(--cell);
   user-select: none;
   -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 .traverse-cell {
+  position: relative;
   width: var(--cell);
   height: var(--cell);
   padding: 0;
   border: 1px solid #777;
-  background: #c7c7c7;
+  background: #bdbdbd;
   font-family: monospace;
-  font-size: clamp(12px, 3.6vw, 18px);
+  font-size: clamp(11px, 3.4vw, 17px);
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.traverse-cell.inactive {
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+.traverse-cell.revealed {
+  background: #ececec;
+  border-color: #999;
+}
+.traverse-cell.frontier:not(.revealed) {
+  box-shadow: inset 0 0 0 1px #444;
+}
+.traverse-cell.flagged {
+  background: #cfcfcf;
+}
+.traverse-cell.known-safe {
+  background: #d8d8d8;
+}
+.traverse-cell.pickup {
+  background: #d3d3d3;
+  border: 2px solid #333;
+}
+.traverse-cell.door {
+  background: #9f9f9f;
+  border: 2px solid #222;
+}
+.traverse-cell.door.available {
+  background: #f1f1f1;
+  box-shadow: inset 0 0 0 2px #000;
+}
+.traverse-cell.mine {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+.traverse-cell.mine.spent {
+  background: #666;
+}
+.traverse-cell.n1 { color: #0000aa; }
+.traverse-cell.n2 { color: #006000; }
+.traverse-cell.n3 { color: #aa0000; }
+.traverse-cell.n4,
+.traverse-cell.n5,
+.traverse-cell.n6,
+.traverse-cell.n7,
+.traverse-cell.n8 { color: #550055; }
 
-.traverse-cell.visited { background: #ededed; }
-.traverse-cell.current { outline: 3px solid #000; outline-offset: -3px; }
-.traverse-cell.mine { background: #111; color: #fff; border-color: #111; }
+.traverse-cell.hold-pending {
+  background: #aaa;
+  box-shadow: inset 0 0 0 3px #111;
+}
+.traverse-cell.hold-pending::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: #111;
+  animation: holdPulse 430ms linear forwards;
+}
+
+.traverse-door-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-top: 6px;
+}
+.traverse-door-info {
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid #999;
+  background: #e3e3e3;
+}
+.traverse-door-info strong {
+  display: block;
+  font-size: 11px;
+}
+.traverse-door-info span {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.traverse-item-controls {
+  min-height: 34px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 4px;
+}
+.traverse-clue {
+  min-width: 38px;
+  min-height: 30px;
+  border: 1px solid #000;
+  background: #eee;
+  font-family: monospace;
+  font-weight: 700;
+}
+.traverse-clue.active {
+  background: #111;
+  color: #fff;
+}
 
 .traverse-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
-  margin-top: 9px;
+  margin-top: 7px;
 }
-
 .traverse-controls .secondary,
 .traverse-controls .ghost {
-  min-height: 38px;
+  min-height: 36px;
+}
+
+@media (min-width: 521px) {
+  .traverse-board {
+    --cell: min(40px, calc((520px - 28px) / var(--cols)), calc((100svh - 270px) / var(--rows)));
+  }
+}
+
+@media (max-width: 380px) {
+  .traverse-meta strong { font-size: 10px; }
+  .traverse-door-info span { font-size: 8px; }
 }
