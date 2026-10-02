@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.1.8**.
+Versión base: **v0.1.9**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -57,6 +57,15 @@ Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidade
 - Si el jugador está en 0 escudos, la tirada de recompensa se sesga hacia +1 escudo, pero NO lo garantiza: todavía pueden salir +1 espacio de escudo u otros objetos.
 - Recompensa consumible actual: `?` (pista). Se puede acumular. Se arrastra sobre una casilla sin revelar y luego se elige una segunda casilla contigua; consume 1 unidad e informa cuáles de esas dos tienen mina.
 - La información mostrada al elegir descenso es orientativa; el tablero real se genera al entrar.
+
+## Modo developer
+
+- El header incluye un botón `DEV` accesible durante el desarrollo.
+- Al activarlo aparece un panel de pruebas y el botón cambia a `JUGADOR`.
+- El estado DEV persiste en `localStorage` con `buscawacha-dev-mode-v1`.
+- El modo DEV puede modificar únicamente el estado de la run activa; no debe alterar el perfil persistente ni los desbloqueos.
+- Controles actuales: sumar `?`, sumar/quitar escudos, sumar capacidad, completar piso y visualizar minas ya generadas.
+- Los ítems futuros que necesiten test rápido deben poder agregarse desde este panel sin duplicar su lógica de inventario.
 
 ## Mobile-first
 
