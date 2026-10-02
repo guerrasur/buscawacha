@@ -160,15 +160,15 @@ p { line-height: 1.35; }
 }
 .choice-card {
   width: 100%;
-  min-height: 88px;
+  min-height: 128px;
   border: 1px solid #000;
   background: #e5e5e5;
-  padding: 10px 6px;
-  text-align: center;
-  font-weight: 700;
-  font-size: 17px;
+  padding: 10px 7px;
+  text-align: left;
   cursor: pointer;
 }
+.choice-card strong { display: block; font-size: 16px; margin-bottom: 6px; }
+.choice-card span { display: block; font-size: 11px; line-height: 1.35; margin-top: 3px; font-weight: 400; }
 .unlock-notice { margin: 10px 0; padding: 8px; border: 1px solid #000; background: #eee; }
 #deathScreen .ghost { margin-top: 6px; }
 
