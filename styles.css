@@ -78,7 +78,7 @@ p { line-height: 1.35; }
 
 .runbar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   border: 1px solid #777;
   margin-bottom: 9px;
   background: #ddd;
@@ -174,4 +174,10 @@ p { line-height: 1.35; }
 
 @media (min-width: 521px) {
   .board { --cell: min(46px, calc((520px - 28px) / var(--cols))); }
+}
+
+@media (max-width: 380px) {
+  .runbar > div { padding-left: 3px; padding-right: 3px; }
+  .runbar span { font-size: 8px; }
+  .runbar strong { font-size: 12px; }
 }
