@@ -270,7 +270,7 @@
   }
 
   function generateTraverseDungeon(rows, cols, start, doors, shapeId, floorType, floor) {
-    for (let geometryAttempt = 0; geometryAttempt < 10; geometryAttempt++) {
+    for (let geometryAttempt = 0; geometryAttempt < 14; geometryAttempt++) {
       const active = buildTraverseShape(rows, cols, start, doors, shapeId);
       const pickupSpecs = makeTraversePickupSpecs(floorType, floor);
       const pickupKeys = chooseTraversePickupKeys(active, start, doors, pickupSpecs.length);
@@ -625,6 +625,8 @@
     });
 
     const pool = candidates.filter(key => !safeHalo.has(key));
+    const minimumAcceptable = Math.max(4, Math.ceil(desiredMineCount * 0.8));
+    if (pool.length < minimumAcceptable) return null;
     const count = Math.min(desiredMineCount, pool.length);
     const mines = new Set(shuffle(pool).slice(0, count));
     const numbers = computeTraverseNumbers(active, mines);
