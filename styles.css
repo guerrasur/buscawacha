@@ -143,20 +143,32 @@ p { line-height: 1.35; }
   font-weight: 700;
   cursor: pointer;
 }
-.shield-reward.claimed { background: #cfcfcf; }
-.shield-reward:disabled { color: #000; cursor: default; }
-.choice-list { display: grid; border-top: 1px solid #777; margin-top: 12px; }
+.reward-step { margin-top: 12px; }
+.skip-reward {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 6px;
+  border: 1px solid #777;
+  background: #e5e5e5;
+  cursor: pointer;
+}
+.choice-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
 .choice-card {
   width: 100%;
-  text-align: left;
-  border: 0;
-  border-bottom: 1px solid #777;
+  min-height: 88px;
+  border: 1px solid #000;
   background: #e5e5e5;
-  padding: 10px 7px;
-  min-height: 70px;
+  padding: 10px 6px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 17px;
+  cursor: pointer;
 }
-.choice-card strong { display: block; font-size: 16px; margin-bottom: 3px; }
-.choice-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; }
 .unlock-notice { margin: 10px 0; padding: 8px; border: 1px solid #000; background: #eee; }
 #deathScreen .ghost { margin-top: 6px; }
 
