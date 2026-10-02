@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.1.4">
+  <link rel="stylesheet" href="styles.css?v=0.1.5">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.1.4</span>
+        <span id="versionLabel">v0.1.5</span>
       </div>
       <button id="updateButton" class="update-button hidden" type="button">Actualizar</button>
     </header>
@@ -35,7 +35,8 @@
           <div><span>PISO</span><strong id="floorLabel">1</strong></div>
           <div><span>FORMA</span><strong id="shapeLabel">—</strong></div>
           <div><span>MINAS</span><strong id="mineLabel">—</strong></div>
-          <div><span>ESCUDOS</span><strong id="shieldLabel">0</strong></div>
+          <div><span>DIF.</span><strong id="difficultyLabel">1</strong></div>
+          <div><span>ESCUDOS</span><strong id="shieldLabel">0/1</strong></div>
         </div>
 
         <div id="boardWrap" class="board-wrap">
@@ -52,8 +53,8 @@
         <p class="eyebrow">PISO <span id="clearedFloorLabel">1</span> COMPLETADO</p>
         <h2 id="choiceTitle">Recompensa del piso.</h2>
         <div id="rewardStep" class="reward-step">
-          <button id="claimShieldButton" class="shield-reward" type="button">Escudo · tocar para reclamar</button>
-          <button id="skipShieldButton" class="skip-reward" type="button">Seguir sin escudo</button>
+          <button id="claimShieldButton" class="shield-reward" type="button">+1 escudo</button>
+          <button id="skipShieldButton" class="skip-reward" type="button">Seguir sin mejora</button>
         </div>
         <div id="pathStep" class="hidden">
           <div id="choiceList" class="choice-list"></div>
@@ -70,6 +71,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.1.4"></script>
+  <script src="game.js?v=0.1.5"></script>
 </body>
 </html>
