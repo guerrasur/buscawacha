@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.9';
+  const VERSION = '0.1.10';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const DEV_KEY = 'buscawacha-dev-mode-v1';
   const LONG_PRESS_MS = 430;
@@ -29,6 +29,8 @@
   let latestVersion = VERSION;
   let longPressTimer = null;
   let longPressTriggered = false;
+  let longPressCellKey = null;
+  let longPressPointerId = null;
   let clueSelection = null;
   let clueDrag = null;
   let devMode = false;
@@ -482,14 +484,25 @@
     clueSelection = cell;
     const btn = $('.cell[data-key="' + cell.key + '"]');
     if (btn) btn.classList.add('clue-first');
-    $('#gameHint').textContent = 'Pista: elegí una segunda casilla contigua.';
+
+    const validNeighbors = neighbors8(cell.r, cell.c)
+      .map(([r, c]) => cellAt(r, c))
+      .filter(next => next?.active && !next.revealed);
+
+    validNeighbors.forEach(next => {
+      const option = $('.cell[data-key="' + next.key + '"]');
+      if (option) option.classList.add('clue-option');
+    });
+
+    $('#gameHint').textContent = validNeighbors.length
+      ? 'Elegí una de las casillas marcadas.'
+      : 'No hay una segunda casilla válida.';
   }
 
   function cancelClueSelection() {
-    if (clueSelection) {
-      const btn = $('.cell[data-key="' + clueSelection.key + '"]');
-      if (btn) btn.classList.remove('clue-first');
-    }
+    document.querySelectorAll('.cell.clue-first, .cell.clue-option').forEach(btn => {
+      btn.classList.remove('clue-first', 'clue-option');
+    });
     clueSelection = null;
   }
 
@@ -572,19 +585,45 @@
   }
 
   function beginLongPress(e, cell) {
-    if (e.pointerType === 'mouse') return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     cancelLongPress();
     longPressTriggered = false;
+    longPressCellKey = cell.key;
+    longPressPointerId = e.pointerId;
+
+    const btn = $('.cell[data-key="' + cell.key + '"]');
+    if (btn) btn.classList.add('hold-pending');
+
     longPressTimer = setTimeout(() => {
+      longPressTimer = null;
       longPressTriggered = true;
+      const key = longPressCellKey;
+      longPressCellKey = null;
+      longPressPointerId = null;
       toggleFlag(cell);
+
+      const confirmed = key ? $('.cell[data-key="' + key + '"]') : null;
+      if (confirmed) {
+        confirmed.classList.remove('hold-pending');
+        confirmed.classList.add('hold-confirmed');
+        setTimeout(() => confirmed.classList.remove('hold-confirmed'), 160);
+      }
+
       if ('vibrate' in navigator) { try { navigator.vibrate(25); } catch {} }
     }, LONG_PRESS_MS);
   }
 
-  function cancelLongPress() {
+  function cancelLongPress(e) {
+    if (e && longPressPointerId !== null && e.pointerId !== longPressPointerId) return;
     if (longPressTimer) clearTimeout(longPressTimer);
     longPressTimer = null;
+
+    if (longPressCellKey) {
+      const btn = $('.cell[data-key="' + longPressCellKey + '"]');
+      if (btn) btn.classList.remove('hold-pending');
+    }
+    longPressCellKey = null;
+    longPressPointerId = null;
   }
 
   function checkClear() {
