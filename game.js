@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.4';
+  const VERSION = '0.1.5';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const LONG_PRESS_MS = 430;
   const SHAPE_UNLOCKS = [
@@ -63,15 +63,16 @@
   function startRun() {
     profile.runs += 1;
     saveProfile();
-    run = { floor: 1, cleared: 0, shields: 0, rewardClaimedFloor: 0, startedAt: Date.now() };
+    run = { floor: 1, cleared: 0, shields: 0, shieldCapacity: 1, rewardClaimedFloor: 0, pendingReward: null, startedAt: Date.now() };
     startFloor(makeFloorSpec(1, null));
   }
 
   function makeFloorSpec(floor, bias) {
     const shapes = unlockedShapes();
     const shape = shapes[Math.floor(Math.random() * shapes.length)];
-    const baseCells = Math.min(78, 27 + floor * 3);
-    const densityBase = Math.min(0.225, 0.13 + (floor - 1) * 0.006);
+    const difficulty = Math.max(1, floor);
+    const baseCells = Math.min(104, 25 + difficulty * 4);
+    const densityBase = Math.min(0.32, 0.12 + (difficulty - 1) * 0.018);
     let density = densityBase;
     let targetCells = baseCells;
     let trait = 'Equilibrado';
@@ -89,15 +90,15 @@
       trait = 'Más largo';
     }
 
-    const maxSide = Math.min(11, 7 + Math.floor((floor - 1) / 3));
+    const maxSide = Math.min(13, 7 + Math.floor((difficulty - 1) / 2));
     const dims = dimensionsForShape(shape.id, maxSide, targetCells);
-    return { floor, shapeId: shape.id, shapeName: shape.name, density, targetCells, rows: dims.rows, cols: dims.cols, trait };
+    return { floor, difficulty, shapeId: shape.id, shapeName: shape.name, density, targetCells, rows: dims.rows, cols: dims.cols, trait };
   }
 
   function dimensionsForShape(shapeId, maxSide, targetCells) {
-    if (shapeId === 'corridor') return { rows: Math.min(11, maxSide + 1), cols: Math.min(11, maxSide) };
-    if (shapeId === 'ring') return { rows: Math.min(11, maxSide), cols: Math.min(11, maxSide) };
-    const side = Math.max(6, Math.min(11, Math.ceil(Math.sqrt(targetCells * 1.45))));
+    if (shapeId === 'corridor') return { rows: Math.min(13, maxSide + 1), cols: Math.min(13, maxSide) };
+    if (shapeId === 'ring') return { rows: Math.min(13, maxSide), cols: Math.min(13, maxSide) };
+    const side = Math.max(6, Math.min(13, Math.ceil(Math.sqrt(targetCells * 1.45))));
     return { rows: side, cols: side };
   }
 
@@ -109,6 +110,7 @@
     $('#floorLabel').textContent = spec.floor;
     $('#shapeLabel').textContent = spec.shapeName;
     $('#mineLabel').textContent = board.mineCount;
+    $('#difficultyLabel').textContent = spec.difficulty;
     updateShieldLabel();
     $('#gameHint').textContent = 'Toque: revelar · Mantener: bandera';
     renderBoard();
@@ -362,19 +364,53 @@
 
   function updateShieldLabel() {
     const label = $('#shieldLabel');
-    if (label) label.textContent = run ? run.shields : 0;
+    if (label) label.textContent = run ? `${run.shields}/${run.shieldCapacity}` : '0/1';
   }
 
-  function claimFloorShield() {
-    if (!run || run.rewardClaimedFloor === run.floor) return;
+  function rollFloorReward() {
+    if (run.floor === 1) return 'shield';
+    const pool = ['none', 'capacity'];
+    if (run.shields < run.shieldCapacity) pool.push('shield');
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function renderFloorReward() {
+    run.pendingReward = rollFloorReward();
+    const claim = $('#claimShieldButton');
+    const skip = $('#skipShieldButton');
+
+    claim.classList.remove('hidden');
+    skip.textContent = 'Seguir sin mejora';
+
+    if (run.pendingReward === 'shield') {
+      claim.textContent = '+1 escudo';
+      skip.textContent = 'Seguir sin escudo';
+    } else if (run.pendingReward === 'capacity') {
+      claim.textContent = '+1 espacio de escudo';
+    } else {
+      claim.classList.add('hidden');
+      skip.textContent = 'Seguir';
+    }
+  }
+
+  function claimFloorReward() {
+    if (!run || run.rewardClaimedFloor === run.floor || !run.pendingReward) return;
     run.rewardClaimedFloor = run.floor;
-    run.shields += 1;
+
+    if (run.pendingReward === 'shield' && run.shields < run.shieldCapacity) {
+      run.shields += 1;
+    } else if (run.pendingReward === 'capacity') {
+      run.shieldCapacity += 1;
+    }
+
+    run.pendingReward = null;
     updateShieldLabel();
     showPathChoices();
   }
 
-  function skipFloorShield() {
+  function skipFloorReward() {
     if (!run) return;
+    run.pendingReward = null;
     showPathChoices();
   }
 
@@ -399,6 +435,7 @@
     $('#choiceTitle').textContent = 'Recompensa del piso.';
     $('#rewardStep').classList.remove('hidden');
     $('#pathStep').classList.add('hidden');
+    renderFloorReward();
     const biases = shuffle(['safe', 'dense', 'long']).slice(0, 2);
     pendingChoices = biases.map(bias => makeFloorSpec(run.floor + 1, bias));
     $('#choiceList').innerHTML = '';
@@ -524,8 +561,8 @@
   });
   $('#homeButton').addEventListener('click', () => { renderHome(); showScreen('#homeScreen'); });
   $('#restartRunButton').addEventListener('click', abandonRun);
-  $('#claimShieldButton').addEventListener('click', claimFloorShield);
-  $('#skipShieldButton').addEventListener('click', skipFloorShield);
+  $('#claimShieldButton').addEventListener('click', claimFloorReward);
+  $('#skipShieldButton').addEventListener('click', skipFloorReward);
   $('#updateButton').addEventListener('click', installLatestVersion);
   window.addEventListener('focus', checkForUpdate);
   setInterval(checkForUpdate, 60000);
