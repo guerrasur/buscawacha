@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.2.0">
+  <link rel="stylesheet" href="styles.css?v=0.3.0">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.2.0</span>
+        <span id="versionLabel">v0.3.0</span>
       </div>
       <div class="topbar-actions">
         <button id="devToggleButton" class="dev-toggle" type="button" aria-expanded="false" aria-controls="devPanel">DEV</button>
@@ -50,14 +50,33 @@
       </section>
 
       <section id="traverseScreen" class="screen hidden" aria-live="polite">
-        <h1>Travesía</h1>
-        <p class="lead">Llegá desde la fila inferior hasta la fila superior.</p>
-        <p id="traverseStatus" class="traverse-status">Llegá a la fila superior.</p>
-        <div class="traverse-board-wrap">
-          <div id="traverseBoard" class="traverse-board" role="grid" aria-label="Tablero de Travesía"></div>
+        <div class="traverse-meta">
+          <div><span>PISO</span><strong id="traverseFloorLabel">1</strong></div>
+          <div><span>FORMA</span><strong id="traverseShapeLabel">—</strong></div>
+          <div><span>MINAS</span><strong id="traverseMineLabel">—</strong></div>
+          <div><span>ESCUDOS</span><strong id="traverseShieldLabel">0</strong></div>
+          <div><span>RESCATES</span><strong id="traverseRescueLabel">0</strong></div>
         </div>
+
+        <p id="traverseStatus" class="traverse-status">Abrí camino hasta una puerta.</p>
+        <p id="traverseDetector" class="traverse-detector">Detector 4: —</p>
+
+        <div class="traverse-board-wrap">
+          <div id="traverseBoard" class="traverse-board" role="grid" aria-label="Mazmorra de Travesía"></div>
+        </div>
+
+        <div id="traverseDoorLegend" class="traverse-door-legend" aria-label="Salidas"></div>
+
+        <div class="traverse-item-controls">
+          <button id="traverseClueButton" class="traverse-clue hidden" type="button">
+            ? <small id="traverseClueCount">0</small>
+          </button>
+        </div>
+
+        <p class="hint">Toque: abrir frontera · Mantener: bandera · S/R/? son objetivos seguros</p>
+
         <div class="traverse-controls">
-          <button id="restartTraverseButton" class="secondary" type="button">Reiniciar</button>
+          <button id="restartTraverseButton" class="secondary" type="button">Nueva travesía</button>
           <button id="traverseHomeButton" class="ghost" type="button">Volver al menú</button>
         </div>
       </section>
@@ -109,6 +128,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.2.0"></script>
+  <script src="game.js?v=0.3.0"></script>
 </body>
 </html>
