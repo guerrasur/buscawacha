@@ -582,12 +582,38 @@
   }
 
   function makeTraverseFallback(active, candidates, desiredMineCount, start, doors, pickups) {
-    const guaranteed = new Set([start.key]);
     const targets = [...doors.map(door => door.key), ...pickups.keys()];
-    targets.forEach(target => {
-      const path = traverseShortestPath(active, start.key, target);
-      path.forEach(key => guaranteed.add(key));
-    });
+    const paths = targets
+      .map(target => traverseShortestPath(active, start.key, target))
+      .filter(path => path.length > 0);
+    const guaranteed = new Set([start.key]);
+    paths.forEach(path => path.forEach(key => guaranteed.add(key)));
+
+    const haloStrides = [4, 3, 2];
+    for (const stride of haloStrides) {
+      const protectedCells = new Set(guaranteed);
+      paths.forEach(path => {
+        path.forEach((key, index) => {
+          if (index % stride !== 0) return;
+          const [r, c] = fromKey(key);
+          neighbors8(r, c).forEach(([nr, nc]) => {
+            const next = keyOf(nr, nc);
+            if (active.has(next)) protectedCells.add(next);
+          });
+        });
+      });
+
+      const pool = candidates.filter(key => !protectedCells.has(key));
+      if (pool.length < desiredMineCount) continue;
+
+      for (let attempt = 0; attempt < 90; attempt++) {
+        const mines = new Set(shuffle(pool).slice(0, desiredMineCount));
+        const numbers = computeTraverseNumbers(active, mines);
+        if (isTraverseLayoutSolvable(active, mines, numbers, start, doors, pickups)) {
+          return { mines, numbers };
+        }
+      }
+    }
 
     const safeHalo = new Set(guaranteed);
     guaranteed.forEach(key => {
