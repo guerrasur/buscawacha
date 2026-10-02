@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.1.9**.
+Versión base: **v0.1.10**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -55,7 +55,7 @@ Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidade
 - El primer piso mantiene una mejora garantizada de +1 escudo.
 - Desde el segundo piso, la recompensa depende del tipo de piso completado.
 - Si el jugador está en 0 escudos, la tirada de recompensa se sesga hacia +1 escudo, pero NO lo garantiza: todavía pueden salir +1 espacio de escudo u otros objetos.
-- Recompensa consumible actual: `?` (pista). Se puede acumular. Se arrastra sobre una casilla sin revelar y luego se elige una segunda casilla contigua; consume 1 unidad e informa cuáles de esas dos tienen mina.
+- Recompensa consumible actual: `?` (pista). Se puede acumular. Los ítems consumibles se muestran centrados debajo del mapa, sin texto, sólo con su icono y contador. `?` se arrastra sobre una casilla sin revelar; esa primera casilla queda marcada y se resaltan sólo las casillas contiguas válidas para elegir la segunda. Consume 1 unidad e informa cuáles de esas dos tienen mina.
 - La información mostrada al elegir descenso es orientativa; el tablero real se genera al entrar.
 
 ## Modo developer
@@ -73,7 +73,7 @@ El celular es la plataforma principal.
 
 - No depender de hover.
 - Tap corto siempre revela una casilla.
-- Mantener pulsada una casilla alterna su bandera.
+- Mantener pulsada una casilla alterna su bandera tanto con touch como con mouse. Mientras se mantiene pulsada debe existir feedback visual simple antes de confirmar la bandera.
 - No usar un selector de modo Revelar/Bandera en la interfaz.
 - Evitar scroll horizontal.
 - El tablero debe entrar en el ancho del viewport.
