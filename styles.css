@@ -34,7 +34,42 @@ button:focus-visible { outline: 2px dotted #000; outline-offset: 2px; }
 .topbar > div { display: flex; align-items: baseline; gap: 7px; }
 .topbar strong { font-size: 15px; }
 .topbar span { font-family: monospace; font-size: 11px; }
-.update-button { min-height: 28px; border: 1px solid #000; background: #e8e8e8; padding: 3px 7px; }
+.topbar-actions { display: flex; align-items: center; gap: 5px; }
+.update-button, .dev-toggle { min-height: 28px; border: 1px solid #000; background: #e8e8e8; padding: 3px 7px; }
+.dev-toggle { font-family: monospace; font-size: 11px; font-weight: 700; }
+.dev-toggle.active { background: #111; color: #fff; }
+
+.dev-panel {
+  margin: 0;
+  padding: 7px 8px 8px;
+  border-bottom: 1px solid #777;
+  background: #d8d8d8;
+}
+.dev-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-family: monospace;
+  font-size: 10px;
+}
+.dev-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+.dev-grid button {
+  min-height: 32px;
+  padding: 4px;
+  border: 1px solid #555;
+  background: #eee;
+  font-size: 11px;
+  font-weight: 700;
+}
+.cell.dev-mine {
+  outline: 2px dashed #000;
+  outline-offset: -4px;
+}
 
 main { padding: 10px 8px 18px; }
 .screen { width: 100%; }
