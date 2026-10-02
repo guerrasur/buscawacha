@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.6';
+  const VERSION = '0.1.7';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const LONG_PRESS_MS = 430;
   const FLOOR_TYPES = {
@@ -282,6 +282,40 @@
     if (cell.revealed) {
       btn.classList.add('revealed');
       if (cell.mine) {
+        btn.classList.add('mine');
+        btn.textContent = '✹';
+        btn.setAttribute('aria-label', 'Mina');
+      } else if (cell.number > 0) {
+        btn.textContent = cell.number;
+        btn.classList.add(`n${cell.number}`);
+        btn.setAttribute('aria-label', `${cell.number} minas alrededor`);
+      } else {
+        btn.setAttribute('aria-label', 'Vacía');
+      }
+    } else if (cell.flagged) {
+      btn.classList.add('flagged');
+      btn.textContent = '⚑';
+      btn.setAttribute('aria-label', 'Marcada con bandera');
+    }
+  }
+
+  function repaintCell(cell) {
+    const btn = $(`.cell[data-key="${cell.key}"]`);
+    if (btn) paintCell(btn, cell);
+  }
+
+  function handleCellAction(cell) {
+    if (!cell.active || cell.revealed || board.ended) return;
+    reveal(cell);
+  }
+
+  function reveal(cell) {
+    if (cell.flagged || cell.revealed || board.ended) return;
+    if (!board.minesPlaced) placeMines(cell);
+    cell.revealed = true;
+    repaintCell(cell);
+
+    if (cell.mine) {
       const mineDamage = Math.max(1, board.spec.mineDamage || 1);
       if (run.shields >= mineDamage) {
         run.shields -= mineDamage;
@@ -289,7 +323,7 @@
         const hitButton = document.querySelector('.cell[data-key="' + cell.key + '"]');
         if (hitButton) hitButton.classList.add('shielded-hit');
         $('#gameHint').textContent = mineDamage === 2
-          ? 'Mina pesada: 2 escudos consumidos. La run continúa.'
+          ? 'Piso pesado: 2 escudos consumidos. La run continúa.'
           : 'Escudo consumido. La run continúa.';
         if ('vibrate' in navigator) { try { navigator.vibrate([35, 45, 35]); } catch {} }
         return;
