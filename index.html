@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#f4f4f4">
+  <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
+  <title>Buscawacha</title>
+  <link rel="stylesheet" href="styles.css?v=0.1.0">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <strong>BUSCAWACHA</strong>
+        <span id="versionLabel">v0.1.0</span>
+      </div>
+      <button id="updateButton" class="update-button hidden" type="button">Actualizar</button>
+    </header>
+
+    <main>
+      <section id="homeScreen" class="screen">
+        <h1>Buscaminas, piso por piso.</h1>
+        <p class="lead">Completá un tablero para descender. Pisá una mina y la run termina.</p>
+        <div id="homeStats" class="stats"></div>
+        <button id="startButton" class="primary" type="button">Nueva run</button>
+        <details class="howto">
+          <summary>Cómo jugar</summary>
+          <p>Toque: revelar. Activá <b>Bandera</b> para marcar minas. También podés mantener presionada una casilla. El primer toque nunca contiene una mina.</p>
+        </details>
+      </section>
+
+      <section id="gameScreen" class="screen hidden" aria-live="polite">
+        <div class="runbar">
+          <div><span>PISO</span><strong id="floorLabel">1</strong></div>
+          <div><span>FORMA</span><strong id="shapeLabel">—</strong></div>
+          <div><span>MINAS</span><strong id="mineLabel">—</strong></div>
+        </div>
+
+        <div id="boardWrap" class="board-wrap">
+          <div id="board" class="board" role="grid" aria-label="Tablero de Buscaminas"></div>
+        </div>
+
+        <div class="controls">
+          <button id="modeButton" type="button" class="secondary">Modo: revelar</button>
+          <button id="restartRunButton" type="button" class="ghost">Abandonar run</button>
+        </div>
+        <p id="gameHint" class="hint">Revelá todas las casillas que no tengan minas.</p>
+      </section>
+
+      <section id="choiceScreen" class="screen hidden">
+        <p class="eyebrow">PISO <span id="clearedFloorLabel">1</span> COMPLETADO</p>
+        <h2>Elegí el siguiente descenso.</h2>
+        <div id="choiceList" class="choice-list"></div>
+      </section>
+
+      <section id="deathScreen" class="screen hidden">
+        <p class="eyebrow">RUN TERMINADA</p>
+        <h2>Encontraste una mina.</h2>
+        <div id="deathStats" class="stats"></div>
+        <div id="unlockNotice" class="unlock-notice hidden"></div>
+        <button id="retryButton" class="primary" type="button">Nueva run</button>
+        <button id="homeButton" class="ghost" type="button">Volver al inicio</button>
+      </section>
+    </main>
+  </div>
+  <script src="game.js?v=0.1.0"></script>
+</body>
+</html>
