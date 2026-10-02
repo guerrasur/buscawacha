@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const LONG_PRESS_MS = 430;
   const SHAPE_UNLOCKS = [
@@ -30,10 +30,12 @@
       return {
         bestFloor: Math.max(0, Number(p?.bestFloor) || 0),
         totalFloors: Math.max(0, Number(p?.totalFloors) || 0),
-        runs: Math.max(0, Number(p?.runs) || 0)
+        runs: Math.max(0, Number(p?.runs) || 0),
+        echoes: Math.max(0, Number(p?.echoes ?? p?.totalFloors) || 0),
+        deaths: Math.max(0, Number(p?.deaths) || 0)
       };
     } catch {
-      return { bestFloor: 0, totalFloors: 0, runs: 0 };
+      return { bestFloor: 0, totalFloors: 0, runs: 0, echoes: 0, deaths: 0 };
     }
   }
 
@@ -41,8 +43,8 @@
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch {}
   }
 
-  function unlockedShapes(totalFloors = profile.totalFloors) {
-    return SHAPE_UNLOCKS.filter(s => totalFloors >= s.at);
+  function unlockedShapes(echoes = profile.echoes) {
+    return SHAPE_UNLOCKS.filter(s => echoes >= s.at);
   }
 
   function showScreen(selector) {
@@ -54,7 +56,7 @@
     const unlocked = unlockedShapes().length;
     $('#homeStats').innerHTML = [
       ['Mejor piso', profile.bestFloor || '—'],
-      ['Pisos totales', profile.totalFloors],
+      ['Ecos', profile.echoes],
       ['Formas', `${unlocked}/${SHAPE_UNLOCKS.length}`]
     ].map(([label, value]) => `<div class="stat"><span>${label}</span><strong>${value}</strong></div>`).join('');
   }
@@ -62,7 +64,7 @@
   function startRun() {
     profile.runs += 1;
     saveProfile();
-    run = { floor: 1, cleared: 0, startedAt: Date.now(), newUnlocks: [] };
+    run = { floor: 1, cleared: 0, startedAt: Date.now() };
     inputMode = 'reveal';
     updateModeButton();
     startFloor(makeFloorSpec(1, null));
@@ -358,10 +360,6 @@
     run.cleared += 1;
     profile.totalFloors += 1;
     saveProfile();
-    const before = unlockedShapes(profile.totalFloors - 1).map(s => s.id);
-    const after = unlockedShapes(profile.totalFloors);
-    const unlocked = after.find(s => !before.includes(s.id)) || null;
-    if (unlocked && !run.newUnlocks.some(s => s.id === unlocked.id)) run.newUnlocks.push(unlocked);
     setTimeout(showChoices, 180);
   }
 
@@ -391,17 +389,25 @@
     board.cells.filter(c => c.active && c.mine).forEach(c => { c.revealed = true; repaintCell(c); });
     const hitButton = $(`.cell[data-key="${hit.key}"]`);
     if (hitButton) hitButton.textContent = '✹';
+
+    const before = unlockedShapes().map(s => s.id);
+    const earned = run.cleared;
+    profile.echoes += earned;
+    profile.deaths += 1;
+    saveProfile();
+    const newUnlocks = unlockedShapes().filter(s => !before.includes(s.id));
+
     setTimeout(() => {
       showScreen('#deathScreen');
       $('#deathScreen h2').textContent = 'Encontraste una mina.';
       $('#deathStats').innerHTML = [
         ['Llegaste', `Piso ${run.floor}`],
         ['Superados', run.cleared],
-        ['Récord', profile.bestFloor || '—']
+        ['Ecos', `+${earned}`]
       ].map(([label, value]) => `<div class="stat"><span>${label}</span><strong>${value}</strong></div>`).join('');
       const notice = $('#unlockNotice');
-      if (run.newUnlocks.length) {
-        notice.textContent = `Nueva forma desbloqueada: ${run.newUnlocks.map(s => s.name).join(', ')}.`;
+      if (newUnlocks.length) {
+        notice.textContent = `Nueva forma desbloqueada: ${newUnlocks.map(s => s.name).join(', ')}.`;
         notice.classList.remove('hidden');
       } else {
         notice.classList.add('hidden');
@@ -417,9 +423,15 @@
     $('#deathStats').innerHTML = [
       ['Llegaste', `Piso ${run.floor}`],
       ['Superados', run.cleared],
-      ['Récord', profile.bestFloor || '—']
+      ['Ecos', '+0']
     ].map(([label, value]) => `<div class="stat"><span>${label}</span><strong>${value}</strong></div>`).join('');
-    $('#unlockNotice').classList.add('hidden');
+    const notice = $('#unlockNotice');
+    if (run.cleared > 0) {
+      notice.textContent = 'Los ecos pendientes de esta run no se acreditan al abandonar.';
+      notice.classList.remove('hidden');
+    } else {
+      notice.classList.add('hidden');
+    }
   }
 
   function updateModeButton() {

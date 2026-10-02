@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.1.0**.
+Versión base: **v0.1.1**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -29,14 +29,18 @@ La progresión persistente debe ser principalmente horizontal, no de poder.
 Persistir en `localStorage`:
 - mejor piso alcanzado;
 - pisos totales completados;
-- cantidad de runs.
+- cantidad de runs;
+- ecos bancados;
+- cantidad de muertes.
 
-Desbloqueos actuales por pisos totales:
+Cada piso superado vale 1 eco pendiente. Los ecos de una run se acreditan únicamente cuando el jugador pisa una mina y muere. Abandonar una run descarta esos ecos pendientes.
+
+Desbloqueos actuales por ecos bancados:
 - Sala: inicio;
 - Cruz: inicio;
-- Pasillo: 3;
-- Anillo: 8;
-- Caverna: 15.
+- Pasillo: 3 ecos;
+- Anillo: 8 ecos;
+- Caverna: 15 ecos.
 
 Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidades del jugador.
 
@@ -101,16 +105,17 @@ No eliminar esta mecánica en futuras updates.
 Antes de publicar:
 1. Revisar el estado actual de `main` para no pisar cambios nuevos.
 2. Incrementar versión cuando cambia comportamiento o contenido jugable.
-3. Mantener compatibilidad con `buscawacha-profile-v1`, o migrarla deliberadamente.
+3. Mantener compatibilidad con `buscawacha-profile-v1`, incluyendo ecos y muertes, o migrarla deliberadamente.
 4. Verificar primer toque seguro.
 5. Verificar banderas por botón y long press.
 6. Verificar expansión de ceros.
 7. Verificar victoria al revelar todas las no-minas.
-8. Verificar muerte al tocar mina.
-9. Verificar elección entre dos pisos.
-10. Verificar que las formas activas sean conectadas.
-11. Verificar layout en viewport móvil angosto.
-12. Verificar que el detector de versión no borre progreso.
+8. Verificar muerte al tocar mina y acreditación de ecos pendientes.
+9. Verificar que abandonar NO acredite ecos pendientes.
+10. Verificar elección entre dos pisos.
+11. Verificar que las formas activas sean conectadas.
+12. Verificar layout en viewport móvil angosto.
+13. Verificar que el detector de versión no borre progreso.
 
 ## Alcance actual
 
