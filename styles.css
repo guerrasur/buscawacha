@@ -78,7 +78,7 @@ p { line-height: 1.35; }
 
 .runbar {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   border: 1px solid #777;
   margin-bottom: 9px;
   background: #ddd;
@@ -124,6 +124,7 @@ p { line-height: 1.35; }
 .cell.revealed { background: #e8e8e8; border-color: #999; }
 .cell.flagged { background: #cfcfcf; }
 .cell.mine { background: #111; color: #fff; border-color: #111; }
+.cell.mine.shielded-hit { background: #777; color: #fff; border-color: #111; }
 .cell.n1 { color: #0000aa; }
 .cell.n2 { color: #006000; }
 .cell.n3 { color: #aa0000; }
@@ -133,6 +134,17 @@ p { line-height: 1.35; }
 .controls button { min-height: 34px; font-size: 13px; }
 .hint { margin: 6px 0 0; text-align: center; font-size: 12px; min-height: 18px; }
 
+.shield-reward {
+  width: 100%;
+  min-height: 46px;
+  margin: 12px 0 4px;
+  border: 2px solid #000;
+  background: #f4f4f4;
+  font-weight: 700;
+  cursor: pointer;
+}
+.shield-reward.claimed { background: #cfcfcf; }
+.shield-reward:disabled { color: #000; cursor: default; }
 .choice-list { display: grid; border-top: 1px solid #777; margin-top: 12px; }
 .choice-card {
   width: 100%;
