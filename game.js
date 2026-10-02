@@ -1,14 +1,23 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const DEV_KEY = 'buscawacha-dev-mode-v1';
   const LONG_PRESS_MS = 430;
-  const TRAVERSE_COLS = 10;
-  const TRAVERSE_ROWS = 12;
-  const TRAVERSE_MINES = 18;
-  const TRAVERSE_GENERATION_ATTEMPTS = 500;
+  const TRAVERSE_COLS = 11;
+  const TRAVERSE_ROWS = 13;
+  const TRAVERSE_GENERATION_ATTEMPTS = 260;
+  const TRAVERSE_SHAPES = [
+    { id: 'cave', name: 'Caverna' },
+    { id: 'corridors', name: 'Pasillos' },
+    { id: 'chambers', name: 'Salas rotas' }
+  ];
+  const TRAVERSE_FLOOR_TYPES = {
+    safe: { id: 'safe', name: 'Seguro', density: 0.105, pickups: 1, description: 'menos minas · 1 objeto' },
+    normal: { id: 'normal', name: 'Normal', density: 0.145, pickups: 1, description: 'riesgo medio · 1 objeto' },
+    dangerous: { id: 'dangerous', name: 'Peligroso', density: 0.185, pickups: 2, description: 'más minas · 2 objetos' }
+  };
   const FLOOR_TYPES = {
     safe: { id: 'safe', name: 'Piso seguro', rewardChance: 0.10, rewardQuality: 'Baja', densityDelta: -0.035, cellDelta: 5, mineDamage: 1 },
     normal: { id: 'normal', name: 'Piso normal', rewardChance: 0.40, rewardQuality: 'Normal', densityDelta: 0, cellDelta: 0, mineDamage: 1 },
@@ -30,6 +39,9 @@
   let run = null;
   let board = null;
   let traverse = null;
+  let traversePressTimer = null;
+  let traversePressKey = null;
+  let traverseLongPressTriggered = false;
   let pendingChoices = [];
   let latestVersion = VERSION;
   let longPressTimer = null;
@@ -176,102 +188,461 @@
   function startTraverse() {
     run = null;
     board = null;
-    traverse = createTraverseState();
+    traverse = createTraverseState({
+      floor: 1,
+      shields: 0,
+      clues: 0,
+      rescues: 0
+    }, 'normal');
     showScreen('#traverseScreen');
     renderTraverse();
   }
 
-  function createTraverseState() {
+  function createTraverseState(meta, floorTypeId) {
     const rows = TRAVERSE_ROWS;
     const cols = TRAVERSE_COLS;
-    const mineCount = TRAVERSE_MINES;
+    const floor = Math.max(1, Number(meta.floor) || 1);
+    const floorType = TRAVERSE_FLOOR_TYPES[floorTypeId] || TRAVERSE_FLOOR_TYPES.normal;
+    const shape = TRAVERSE_SHAPES[Math.floor(Math.random() * TRAVERSE_SHAPES.length)];
     const start = { r: rows - 1, c: Math.floor(cols / 2) };
-    const mines = generateTraverseMines(rows, cols, mineCount, start);
-    return {
+    start.key = keyOf(start.r, start.c);
+    const doors = makeTraverseDoors(cols, floor + 1);
+    const generated = generateTraverseDungeon(rows, cols, start, doors, shape.id, floorType, floor);
+
+    const state = {
       rows,
       cols,
-      mineCount,
-      mines,
-      visited: new Set([keyOf(start.r, start.c)]),
-      current: start,
+      floor,
+      floorTypeId: floorType.id,
+      floorTypeName: floorType.name,
+      shapeId: shape.id,
+      shapeName: shape.name,
+      start,
+      doors,
+      active: generated.active,
+      mines: generated.mines,
+      numbers: generated.numbers,
+      mineCount: generated.mines.size,
+      pickups: generated.pickups,
+      revealed: new Set(),
+      flags: new Set(),
+      knownSafe: new Set(),
+      hitMines: new Set(),
+      shields: Math.max(0, Number(meta.shields) || 0),
+      clues: Math.max(0, Number(meta.clues) || 0),
+      rescues: Math.max(0, Number(meta.rescues) || 0),
+      clueArmed: false,
       ended: false,
-      won: false,
-      revealMines: false
+      revealMines: false,
+      status: 'Abrí camino hasta una puerta.',
+      detector: ''
     };
+
+    revealTraverseCascade(state, start.key, false);
+    state.detector = 'Detector 4: ' + traverseOrthogonalMineCount(state, start.r, start.c);
+    return state;
   }
 
-  function generateTraverseMines(rows, cols, mineCount, start) {
-    const candidates = [];
-    for (let r = 0; r < rows - 1; r++) {
-      for (let c = 0; c < cols; c++) candidates.push(keyOf(r, c));
-    }
-
-    const minimumPathCellsOutsideStartRow = rows - 1;
-    const maxMinesWithPath = candidates.length - minimumPathCellsOutsideStartRow;
-    if (mineCount < 0 || mineCount > maxMinesWithPath) {
-      throw new Error('TRAVERSE_MINES no permite garantizar un camino libre.');
-    }
-
-    for (let attempt = 0; attempt < TRAVERSE_GENERATION_ATTEMPTS; attempt++) {
-      const mines = new Set(shuffle(candidates).slice(0, mineCount));
-      if (hasTraversePath(rows, cols, mines, start)) return mines;
-    }
-
-    const guaranteedPath = makeGuaranteedTraversePath(rows, cols, start);
-    const fallbackPool = candidates.filter(key => !guaranteedPath.has(key));
-    return new Set(shuffle(fallbackPool).slice(0, mineCount));
+  function makeTraverseDoors(cols, nextFloor) {
+    const positions = [
+      Math.max(1, Math.floor(cols * 0.23)),
+      Math.min(cols - 2, Math.floor(cols * 0.77))
+    ];
+    const types = chooseTraverseDoorTypes(nextFloor);
+    return positions.map((c, index) => ({
+      r: 0,
+      c,
+      key: keyOf(0, c),
+      label: index === 0 ? 'A' : 'B',
+      typeId: types[index],
+      type: TRAVERSE_FLOOR_TYPES[types[index]]
+    }));
   }
 
-  function makeGuaranteedTraversePath(rows, cols, start) {
-    const path = new Set([keyOf(start.r, start.c)]);
-    let r = start.r;
-    let c = start.c;
+  function chooseTraverseDoorTypes(nextFloor) {
+    const weighted = nextFloor < 3
+      ? ['safe', 'safe', 'normal', 'normal', 'dangerous']
+      : ['safe', 'normal', 'normal', 'dangerous', 'dangerous'];
+    const first = weighted[Math.floor(Math.random() * weighted.length)];
+    const alternatives = weighted.filter(id => id !== first);
+    const second = alternatives[Math.floor(Math.random() * alternatives.length)] || (first === 'safe' ? 'dangerous' : 'safe');
+    return [first, second];
+  }
 
-    while (r > 0) {
-      if (Math.random() < 0.35) {
-        const directions = shuffle([-1, 1]);
-        const dc = directions.find(delta => c + delta >= 0 && c + delta < cols);
-        if (dc) {
-          c += dc;
-          path.add(keyOf(r, c));
+  function generateTraverseDungeon(rows, cols, start, doors, shapeId, floorType, floor) {
+    for (let geometryAttempt = 0; geometryAttempt < 10; geometryAttempt++) {
+      const active = buildTraverseShape(rows, cols, start, doors, shapeId);
+      const pickupSpecs = makeTraversePickupSpecs(floorType, floor);
+      const pickupKeys = chooseTraversePickupKeys(active, start, doors, pickupSpecs.length);
+      if (pickupKeys.length < pickupSpecs.length) continue;
+
+      const pickups = new Map();
+      pickupSpecs.forEach((spec, index) => {
+        pickups.set(pickupKeys[index], {
+          type: spec.type,
+          icon: spec.icon,
+          label: spec.label,
+          collected: false
+        });
+      });
+
+      const reserved = new Set([start.key]);
+      doors.forEach(door => reserved.add(door.key));
+      pickups.forEach((_, key) => reserved.add(key));
+      neighbors8(start.r, start.c).forEach(([r, c]) => {
+        const key = keyOf(r, c);
+        if (active.has(key)) reserved.add(key);
+      });
+
+      const candidates = [...active].filter(key => !reserved.has(key));
+      const density = clamp(floorType.density + Math.min(0.045, (floor - 1) * 0.004), 0.09, 0.23);
+      const desiredMineCount = Math.max(4, Math.min(candidates.length, Math.round(active.size * density)));
+
+      for (let attempt = 0; attempt < TRAVERSE_GENERATION_ATTEMPTS; attempt++) {
+        const mines = new Set(shuffle(candidates).slice(0, desiredMineCount));
+        const numbers = computeTraverseNumbers(active, mines);
+        if (isTraverseLayoutSolvable(active, mines, numbers, start, doors, pickups)) {
+          return { active, mines, numbers, pickups };
         }
       }
-      r -= 1;
-      path.add(keyOf(r, c));
+
+      const fallback = makeTraverseFallback(active, candidates, desiredMineCount, start, doors, pickups);
+      if (fallback) return { active, mines: fallback.mines, numbers: fallback.numbers, pickups };
     }
-    return path;
+
+    throw new Error('No se pudo generar una Travesía jugable.');
   }
 
-  function hasTraversePath(rows, cols, mines, start) {
-    const startKey = keyOf(start.r, start.c);
-    if (mines.has(startKey)) return false;
+  function makeTraversePickupSpecs(floorType, floor) {
+    const specs = [];
+    const count = Math.max(1, floorType.pickups || 1);
+    for (let i = 0; i < count; i++) {
+      if (floor === 1 && i === 0) {
+        specs.push({ type: 'shield', icon: 'S', label: 'Escudo' });
+      } else if ((floor + i) % 2 === 0) {
+        specs.push({ type: 'clue', icon: '?', label: 'Detector' });
+      } else {
+        specs.push({ type: 'shield', icon: 'S', label: 'Escudo' });
+      }
+    }
+    if (floor >= 2 && Math.random() < 0.55) {
+      specs.push({ type: 'rescue', icon: 'R', label: 'Rescate' });
+    }
+    return specs;
+  }
 
-    const queue = [start];
-    const seen = new Set([startKey]);
-    while (queue.length) {
-      const current = queue.shift();
-      if (current.r === 0) return true;
+  function buildTraverseShape(rows, cols, start, doors, shapeId) {
+    const active = new Set([start.key]);
+    const protectedCells = new Set([start.key]);
 
-      neighbors4(current.r, current.c).forEach(([r, c]) => {
-        if (r < 0 || c < 0 || r >= rows || c >= cols) return;
-        const key = keyOf(r, c);
-        if (mines.has(key) || seen.has(key)) return;
-        seen.add(key);
-        queue.push({ r, c });
+    doors.forEach(door => {
+      carveTraverseRoute(active, protectedCells, start, door, rows, cols, shapeId);
+      active.add(door.key);
+      protectedCells.add(door.key);
+    });
+
+    const total = rows * cols;
+    const targetRatio = shapeId === 'corridors' ? 0.46 : shapeId === 'chambers' ? 0.61 : 0.67;
+    const target = Math.max(active.size, Math.round(total * targetRatio));
+
+    if (shapeId === 'chambers') {
+      const seeds = shuffle([...active]).slice(0, 4);
+      seeds.forEach(key => {
+        const [sr, sc] = fromKey(key);
+        const height = 2 + Math.floor(Math.random() * 2);
+        const width = 2 + Math.floor(Math.random() * 3);
+        for (let r = sr - 1; r < sr - 1 + height; r++) {
+          for (let c = sc - 1; c < sc - 1 + width; c++) {
+            if (r > 0 && r < rows - 1 && c >= 0 && c < cols) active.add(keyOf(r, c));
+          }
+        }
       });
     }
+
+    let guard = 0;
+    while (active.size < target && guard < total * 30) {
+      guard += 1;
+      const existing = [...active];
+      const seed = existing[Math.floor(Math.random() * existing.length)];
+      const [r, c] = fromKey(seed);
+      const options = neighbors4(r, c).filter(([nr, nc]) => {
+        if (nr < 0 || nc < 0 || nr >= rows || nc >= cols) return false;
+        if (nr === 0 && !doors.some(door => door.r === nr && door.c === nc)) return false;
+        if (nr === rows - 1 && !(nr === start.r && nc === start.c)) return false;
+        return true;
+      });
+      if (!options.length) continue;
+      const next = options[Math.floor(Math.random() * options.length)];
+      active.add(keyOf(next[0], next[1]));
+      if (shapeId === 'cave' && Math.random() < 0.28) {
+        neighbors4(next[0], next[1]).forEach(([nr, nc]) => {
+          if (nr > 0 && nr < rows - 1 && nc >= 0 && nc < cols && Math.random() < 0.32) {
+            active.add(keyOf(nr, nc));
+          }
+        });
+      }
+    }
+
+    doors.forEach(door => active.add(door.key));
+    active.add(start.key);
+    return active;
+  }
+
+  function carveTraverseRoute(active, protectedCells, start, door, rows, cols, shapeId) {
+    let r = start.r;
+    let c = start.c;
+    let guard = 0;
+
+    while ((r !== door.r || c !== door.c) && guard < rows * cols * 3) {
+      guard += 1;
+      active.add(keyOf(r, c));
+      protectedCells.add(keyOf(r, c));
+
+      const verticalDistance = r - door.r;
+      const horizontalDistance = door.c - c;
+      if (horizontalDistance !== 0 && (verticalDistance <= Math.abs(horizontalDistance) || Math.random() < 0.42)) {
+        c += Math.sign(horizontalDistance);
+      } else if (r > door.r) {
+        r -= 1;
+      }
+
+      c = clamp(c, 0, cols - 1);
+      r = clamp(r, 0, rows - 1);
+      active.add(keyOf(r, c));
+      protectedCells.add(keyOf(r, c));
+
+      if (shapeId !== 'corridors' && r > 0 && r < rows - 1 && Math.random() < 0.36) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        if (c + side >= 0 && c + side < cols) active.add(keyOf(r, c + side));
+      }
+    }
+  }
+
+  function chooseTraversePickupKeys(active, start, doors, count) {
+    if (count <= 0) return [];
+    const distStart = traverseGraphDistances(active, start.key);
+    const doorDistances = doors.map(door => traverseGraphDistances(active, door.key));
+    const directDoorDistance = Math.min(...doors.map(door => distStart.get(door.key) ?? 999));
+    const blocked = new Set([start.key, ...doors.map(door => door.key)]);
+
+    const scored = [...active]
+      .filter(key => {
+        if (blocked.has(key)) return false;
+        const [r] = fromKey(key);
+        const distance = distStart.get(key) ?? 0;
+        return r > 1 && r < TRAVERSE_ROWS - 1 && distance >= 4;
+      })
+      .map(key => {
+        const fromStart = distStart.get(key) ?? 999;
+        const toDoor = Math.min(...doorDistances.map(map => map.get(key) ?? 999));
+        const detour = fromStart + toDoor - directDoorDistance;
+        return { key, score: detour * 10 + fromStart + Math.random() * 4 };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const chosen = [];
+    for (const candidate of scored) {
+      if (chosen.length >= count) break;
+      const [r, c] = fromKey(candidate.key);
+      const tooClose = chosen.some(existing => {
+        const [er, ec] = fromKey(existing);
+        return Math.abs(r - er) + Math.abs(c - ec) < 4;
+      });
+      if (!tooClose) chosen.push(candidate.key);
+    }
+
+    if (chosen.length < count) {
+      for (const candidate of scored) {
+        if (chosen.length >= count) break;
+        if (!chosen.includes(candidate.key)) chosen.push(candidate.key);
+      }
+    }
+    return chosen;
+  }
+
+  function traverseGraphDistances(active, sourceKey) {
+    const distances = new Map([[sourceKey, 0]]);
+    const queue = [sourceKey];
+    while (queue.length) {
+      const current = queue.shift();
+      const [r, c] = fromKey(current);
+      const nextDistance = distances.get(current) + 1;
+      neighbors4(r, c).forEach(([nr, nc]) => {
+        const key = keyOf(nr, nc);
+        if (!active.has(key) || distances.has(key)) return;
+        distances.set(key, nextDistance);
+        queue.push(key);
+      });
+    }
+    return distances;
+  }
+
+  function computeTraverseNumbers(active, mines) {
+    const numbers = new Map();
+    active.forEach(key => {
+      if (mines.has(key)) return;
+      const [r, c] = fromKey(key);
+      const number = neighbors8(r, c).reduce((total, [nr, nc]) => total + Number(mines.has(keyOf(nr, nc))), 0);
+      numbers.set(key, number);
+    });
+    return numbers;
+  }
+
+  function isTraverseLayoutSolvable(active, mines, numbers, start, doors, pickups) {
+    const revealed = new Set();
+    const flagged = new Set();
+    const knownSafe = new Set([start.key, ...pickups.keys()]);
+    const specialSafe = new Set([...doors.map(door => door.key), ...pickups.keys()]);
+
+    const revealSafe = key => {
+      if (!active.has(key) || mines.has(key) || revealed.has(key)) return false;
+      const queue = [key];
+      let changed = false;
+      while (queue.length) {
+        const current = queue.shift();
+        if (revealed.has(current) || mines.has(current)) continue;
+        revealed.add(current);
+        changed = true;
+        const number = numbers.get(current) ?? 0;
+        if (number !== 0) continue;
+        const [r, c] = fromKey(current);
+        neighbors8(r, c).forEach(([nr, nc]) => {
+          const next = keyOf(nr, nc);
+          if (!active.has(next) || mines.has(next) || revealed.has(next)) return;
+          if (specialSafe.has(next) && next !== key) return;
+          queue.push(next);
+        });
+      }
+      return changed;
+    };
+
+    revealSafe(start.key);
+
+    for (let guard = 0; guard < active.size * 12; guard++) {
+      let changed = false;
+
+      [...knownSafe].forEach(key => {
+        if (!revealed.has(key) && isTraverseFrontierForSet(revealed, key)) {
+          if (revealSafe(key)) changed = true;
+        }
+      });
+
+      const deducedSafe = new Set();
+      revealed.forEach(key => {
+        const number = numbers.get(key);
+        if (number === undefined) return;
+        const [r, c] = fromKey(key);
+        const normalUnknown = [];
+        let flaggedAround = 0;
+
+        neighbors8(r, c).forEach(([nr, nc]) => {
+          const next = keyOf(nr, nc);
+          if (!active.has(next) || specialSafe.has(next) || revealed.has(next)) return;
+          if (flagged.has(next)) flaggedAround += 1;
+          else normalUnknown.push(next);
+        });
+
+        const remaining = number - flaggedAround;
+        if (remaining === 0) {
+          normalUnknown.forEach(next => deducedSafe.add(next));
+        } else if (normalUnknown.length > 0 && remaining === normalUnknown.length) {
+          normalUnknown.forEach(next => {
+            if (!flagged.has(next)) {
+              flagged.add(next);
+              changed = true;
+            }
+          });
+        }
+      });
+
+      deducedSafe.forEach(key => knownSafe.add(key));
+      [...knownSafe].forEach(key => {
+        if (!revealed.has(key) && isTraverseFrontierForSet(revealed, key)) {
+          if (revealSafe(key)) changed = true;
+        }
+      });
+
+      const allDoorsReachable = doors.every(door => isTraverseFrontierForSet(revealed, door.key));
+      const allPickupsReachable = [...pickups.keys()].every(key => revealed.has(key));
+      if (allDoorsReachable && allPickupsReachable) return true;
+      if (!changed) break;
+    }
+
     return false;
   }
 
-  function traverseNumberAt(r, c) {
-    let count = 0;
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (!dr && !dc) continue;
-        if (traverse.mines.has(keyOf(r + dr, c + dc))) count += 1;
-      }
+  function isTraverseFrontierForSet(revealed, key) {
+    const [r, c] = fromKey(key);
+    return neighbors4(r, c).some(([nr, nc]) => revealed.has(keyOf(nr, nc)));
+  }
+
+  function makeTraverseFallback(active, candidates, desiredMineCount, start, doors, pickups) {
+    const guaranteed = new Set([start.key]);
+    const targets = [...doors.map(door => door.key), ...pickups.keys()];
+    targets.forEach(target => {
+      const path = traverseShortestPath(active, start.key, target);
+      path.forEach(key => guaranteed.add(key));
+    });
+
+    const safeHalo = new Set(guaranteed);
+    guaranteed.forEach(key => {
+      const [r, c] = fromKey(key);
+      neighbors8(r, c).forEach(([nr, nc]) => {
+        const next = keyOf(nr, nc);
+        if (active.has(next)) safeHalo.add(next);
+      });
+    });
+
+    const pool = candidates.filter(key => !safeHalo.has(key));
+    const count = Math.min(desiredMineCount, pool.length);
+    const mines = new Set(shuffle(pool).slice(0, count));
+    const numbers = computeTraverseNumbers(active, mines);
+    return { mines, numbers };
+  }
+
+  function traverseShortestPath(active, sourceKey, targetKey) {
+    const queue = [sourceKey];
+    const previous = new Map([[sourceKey, null]]);
+    while (queue.length) {
+      const current = queue.shift();
+      if (current === targetKey) break;
+      const [r, c] = fromKey(current);
+      neighbors4(r, c).forEach(([nr, nc]) => {
+        const next = keyOf(nr, nc);
+        if (!active.has(next) || previous.has(next)) return;
+        previous.set(next, current);
+        queue.push(next);
+      });
     }
-    return count;
+    if (!previous.has(targetKey)) return [];
+    const path = [];
+    let current = targetKey;
+    while (current) {
+      path.push(current);
+      current = previous.get(current);
+    }
+    return path.reverse();
+  }
+
+  function traverseNumberAt(state, r, c) {
+    return state.numbers.get(keyOf(r, c)) ?? 0;
+  }
+
+  function traverseOrthogonalMineCount(state, r, c) {
+    return neighbors4(r, c).reduce((total, [nr, nc]) => total + Number(state.mines.has(keyOf(nr, nc))), 0);
+  }
+
+  function isTraverseDoorKey(key) {
+    return Boolean(traverse?.doors.some(door => door.key === key));
+  }
+
+  function isTraverseFrontier(key) {
+    if (!traverse || traverse.revealed.has(key)) return false;
+    return isTraverseFrontierForSet(traverse.revealed, key);
+  }
+
+  function traversePickupAt(key) {
+    return traverse?.pickups.get(key) || null;
   }
 
   function renderTraverse() {
@@ -284,83 +655,296 @@
     for (let r = 0; r < traverse.rows; r++) {
       for (let c = 0; c < traverse.cols; c++) {
         const key = keyOf(r, c);
-        const isMine = traverse.mines.has(key);
-        const visited = traverse.visited.has(key);
-        const current = traverse.current.r === r && traverse.current.c === c;
+        const active = traverse.active.has(key);
+        const door = traverse.doors.find(item => item.key === key);
+        const pickup = traverse.pickups.get(key);
+        const revealed = traverse.revealed.has(key);
+        const mine = traverse.mines.has(key);
+        const hitMine = traverse.hitMines.has(key);
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'traverse-cell';
-        btn.dataset.r = r;
-        btn.dataset.c = c;
+        btn.dataset.key = key;
 
-        if (visited) btn.classList.add('visited');
-        if (current) btn.classList.add('current');
-
-        if (traverse.revealMines && isMine) {
-          btn.classList.add('mine');
-          btn.textContent = '✹';
-          btn.setAttribute('aria-label', 'Mina');
-        } else if (visited && !isMine) {
-          const number = traverseNumberAt(r, c);
-          if (number > 0) btn.textContent = number;
-          btn.setAttribute('aria-label', number > 0 ? `${number} minas alrededor` : 'Vacía');
-        } else {
-          btn.setAttribute('aria-label', 'Casilla sin visitar');
+        if (!active) {
+          btn.classList.add('inactive');
+          btn.tabIndex = -1;
+          btn.setAttribute('aria-hidden', 'true');
+          root.appendChild(btn);
+          continue;
         }
 
-        btn.addEventListener('click', () => moveTraverseTo(r, c));
+        if (door) {
+          btn.classList.add('door');
+          if (isTraverseFrontier(door.key)) btn.classList.add('available');
+          btn.textContent = door.label;
+          btn.setAttribute('aria-label', 'Puerta ' + door.label + ': ' + door.type.name);
+          btn.addEventListener('click', () => enterTraverseDoor(door));
+          root.appendChild(btn);
+          continue;
+        }
+
+        if (isTraverseFrontier(key) && !revealed && !mine) btn.classList.add('frontier');
+
+        if (traverse.revealMines && mine) {
+          btn.classList.add('mine');
+          btn.textContent = '✹';
+        } else if (hitMine) {
+          btn.classList.add('mine', 'spent');
+          btn.textContent = '✹';
+        } else if (revealed) {
+          btn.classList.add('revealed');
+          const number = traverseNumberAt(traverse, r, c);
+          if (number > 0) {
+            btn.textContent = number;
+            btn.classList.add('n' + number);
+          }
+        } else if (pickup && !pickup.collected) {
+          btn.classList.add('pickup');
+          btn.textContent = pickup.icon;
+          btn.setAttribute('aria-label', pickup.label + ' sin recoger');
+        } else if (traverse.flags.has(key)) {
+          btn.classList.add('flagged');
+          btn.textContent = '⚑';
+        } else if (traverse.knownSafe.has(key)) {
+          btn.classList.add('known-safe');
+          btn.textContent = '·';
+        }
+
+        btn.addEventListener('click', () => {
+          if (traverseLongPressTriggered) {
+            traverseLongPressTriggered = false;
+            return;
+          }
+          handleTraverseCell(r, c);
+        });
+        btn.addEventListener('contextmenu', event => {
+          event.preventDefault();
+          toggleTraverseFlag(key);
+        });
+        btn.addEventListener('pointerdown', event => beginTraverseLongPress(event, key));
+        btn.addEventListener('pointerup', cancelTraverseLongPress);
+        btn.addEventListener('pointercancel', cancelTraverseLongPress);
+        btn.addEventListener('pointerleave', cancelTraverseLongPress);
         root.appendChild(btn);
       }
     }
 
-    const status = $('#traverseStatus');
-    if (traverse.ended) {
-      status.textContent = traverse.won
-        ? 'Victoria: llegaste a la fila superior.'
-        : 'Derrota: pisaste una mina.';
-    } else {
-      status.textContent = 'Llegá a la fila superior.';
-    }
+    $('#traverseFloorLabel').textContent = traverse.floor;
+    $('#traverseShapeLabel').textContent = traverse.shapeName;
+    $('#traverseMineLabel').textContent = traverse.mineCount;
+    $('#traverseShieldLabel').textContent = traverse.shields;
+    $('#traverseRescueLabel').textContent = traverse.rescues;
+    $('#traverseStatus').textContent = traverse.status;
+    $('#traverseDetector').textContent = traverse.detector || 'Detector 4: —';
+
+    const legend = $('#traverseDoorLegend');
+    legend.innerHTML = '';
+    traverse.doors.forEach(door => {
+      const item = document.createElement('div');
+      item.className = 'traverse-door-info';
+      item.innerHTML = '<strong>' + door.label + ' · ' + door.type.name + '</strong><span>' + door.type.description + '</span>';
+      legend.appendChild(item);
+    });
+
+    const clueButton = $('#traverseClueButton');
+    const clueCount = $('#traverseClueCount');
+    clueCount.textContent = traverse.clues;
+    clueButton.classList.toggle('hidden', traverse.clues <= 0);
+    clueButton.classList.toggle('active', traverse.clueArmed);
+    clueButton.disabled = traverse.ended || traverse.clues <= 0;
   }
 
-  function moveTraverseTo(r, c) {
+  function handleTraverseCell(r, c) {
     if (!traverse || traverse.ended) return;
-    const distance = Math.abs(r - traverse.current.r) + Math.abs(c - traverse.current.c);
-    if (distance !== 1 || r < 0 || c < 0 || r >= traverse.rows || c >= traverse.cols) return;
-
     const key = keyOf(r, c);
-    traverse.current = { r, c };
-    traverse.visited.add(key);
+    if (!traverse.active.has(key) || isTraverseDoorKey(key) || traverse.revealed.has(key)) return;
 
-    if (traverse.mines.has(key)) {
-      traverse.ended = true;
-      traverse.revealMines = true;
+    if (traverse.clueArmed) {
+      useTraverseClue(key);
+      return;
+    }
+
+    if (traverse.flags.has(key)) return;
+    if (!isTraverseFrontier(key)) {
+      traverse.status = 'Sólo podés abrir una casilla conectada al territorio revelado.';
       renderTraverse();
       return;
     }
 
-    if (r === 0) {
-      traverse.ended = true;
-      traverse.won = true;
+    if (traverse.mines.has(key)) {
+      if (traverse.shields > 0) {
+        traverse.shields -= 1;
+        traverse.hitMines.add(key);
+        traverse.flags.delete(key);
+        traverse.status = 'Escudo consumido. Esa casilla queda bloqueada.';
+        traverse.detector = 'Detector 4: —';
+        if ('vibrate' in navigator) { try { navigator.vibrate([35, 45, 35]); } catch {} }
+      } else {
+        traverse.ended = true;
+        traverse.revealMines = true;
+        traverse.status = 'Run terminada: pisaste una mina.';
+        traverse.detector = 'Detector 4: —';
+      }
+      renderTraverse();
+      return;
+    }
+
+    const beforeShield = traverse.shields;
+    const beforeClues = traverse.clues;
+    const beforeRescues = traverse.rescues;
+    revealTraverseCascade(traverse, key, true);
+    traverse.detector = 'Detector 4: ' + traverseOrthogonalMineCount(traverse, r, c);
+
+    if (traverse.shields > beforeShield) {
+      traverse.status = 'Escudo recogido. Podés seguir explorando.';
+    } else if (traverse.clues > beforeClues) {
+      traverse.status = 'Detector ? recogido.';
+    } else if (traverse.rescues > beforeRescues) {
+      traverse.status = 'Rescate completado.';
+    } else {
+      traverse.status = 'Seguí abriendo frontera o entrá por una puerta disponible.';
+    }
+
+    renderTraverse();
+  }
+
+  function revealTraverseCascade(state, startKey, collectPickups) {
+    if (!state.active.has(startKey) || state.mines.has(startKey)) return;
+    const queue = [startKey];
+    const queued = new Set([startKey]);
+
+    while (queue.length) {
+      const key = queue.shift();
+      if (state.revealed.has(key) || state.mines.has(key)) continue;
+      if (state.doors.some(door => door.key === key)) continue;
+
+      state.revealed.add(key);
+      state.flags.delete(key);
+      state.knownSafe.delete(key);
+
+      if (collectPickups) collectTraversePickup(state, key);
+
+      const number = state.numbers.get(key) ?? 0;
+      if (number !== 0) continue;
+
+      const [r, c] = fromKey(key);
+      neighbors8(r, c).forEach(([nr, nc]) => {
+        const next = keyOf(nr, nc);
+        if (!state.active.has(next) || state.mines.has(next) || state.revealed.has(next) || queued.has(next)) return;
+        if (state.doors.some(door => door.key === next)) return;
+        const pickup = state.pickups.get(next);
+        if (pickup && !pickup.collected) return;
+        queued.add(next);
+        queue.push(next);
+      });
+    }
+  }
+
+  function collectTraversePickup(state, key) {
+    const pickup = state.pickups.get(key);
+    if (!pickup || pickup.collected) return;
+    pickup.collected = true;
+
+    if (pickup.type === 'shield') {
+      state.shields += 1;
+    } else if (pickup.type === 'clue') {
+      state.clues += 1;
+    } else if (pickup.type === 'rescue') {
+      state.rescues += 1;
+    }
+  }
+
+  function enterTraverseDoor(door) {
+    if (!traverse || traverse.ended) return;
+    if (!isTraverseFrontier(door.key)) {
+      traverse.status = 'Primero abrí un camino hasta esa puerta.';
+      renderTraverse();
+      return;
+    }
+
+    const meta = {
+      floor: traverse.floor + 1,
+      shields: traverse.shields,
+      clues: traverse.clues,
+      rescues: traverse.rescues
+    };
+    traverse = createTraverseState(meta, door.typeId);
+    renderTraverse();
+  }
+
+  function toggleTraverseFlag(key) {
+    if (!traverse || traverse.ended || !traverse.active.has(key) || traverse.revealed.has(key) || isTraverseDoorKey(key)) return;
+    const pickup = traversePickupAt(key);
+    if (pickup && !pickup.collected) return;
+    if (traverse.knownSafe.has(key)) return;
+
+    if (traverse.flags.has(key)) traverse.flags.delete(key);
+    else traverse.flags.add(key);
+    renderTraverse();
+  }
+
+  function beginTraverseLongPress(event, key) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    cancelTraverseLongPress();
+    traverseLongPressTriggered = false;
+    traversePressKey = key;
+    const btn = $('.traverse-cell[data-key="' + key + '"]');
+    if (btn) btn.classList.add('hold-pending');
+
+    traversePressTimer = setTimeout(() => {
+      traversePressTimer = null;
+      traverseLongPressTriggered = true;
+      const heldKey = traversePressKey;
+      traversePressKey = null;
+      toggleTraverseFlag(heldKey);
+      if ('vibrate' in navigator) { try { navigator.vibrate(25); } catch {} }
+    }, LONG_PRESS_MS);
+  }
+
+  function cancelTraverseLongPress() {
+    if (traversePressTimer) clearTimeout(traversePressTimer);
+    traversePressTimer = null;
+    if (traversePressKey) {
+      const btn = $('.traverse-cell[data-key="' + traversePressKey + '"]');
+      if (btn) btn.classList.remove('hold-pending');
+    }
+    traversePressKey = null;
+  }
+
+  function toggleTraverseClue() {
+    if (!traverse || traverse.ended || traverse.clues <= 0) return;
+    traverse.clueArmed = !traverse.clueArmed;
+    traverse.status = traverse.clueArmed
+      ? 'Detector ?: elegí una casilla de la frontera.'
+      : 'Detector cancelado.';
+    renderTraverse();
+  }
+
+  function useTraverseClue(key) {
+    if (!traverse || !traverse.clueArmed || traverse.clues <= 0) return;
+    const pickup = traversePickupAt(key);
+    if (!traverse.active.has(key) || traverse.revealed.has(key) || isTraverseDoorKey(key) || (pickup && !pickup.collected)) return;
+    if (!isTraverseFrontier(key)) {
+      traverse.status = 'El detector sólo se usa sobre la frontera actual.';
+      renderTraverse();
+      return;
+    }
+
+    traverse.clues -= 1;
+    traverse.clueArmed = false;
+    if (traverse.mines.has(key)) {
+      traverse.flags.add(key);
+      traverse.status = 'Detector: mina. Quedó marcada.';
+    } else {
+      traverse.knownSafe.add(key);
+      traverse.status = 'Detector: casilla segura.';
     }
     renderTraverse();
   }
 
-  function handleTraverseKeydown(event) {
-    if (!traverse || traverse.ended || $('#traverseScreen').classList.contains('hidden')) return;
-    const directions = {
-      ArrowUp: [-1, 0],
-      ArrowDown: [1, 0],
-      ArrowLeft: [0, -1],
-      ArrowRight: [0, 1]
-    };
-    const direction = directions[event.key];
-    if (!direction) return;
-    event.preventDefault();
-    moveTraverseTo(traverse.current.r + direction[0], traverse.current.c + direction[1]);
-  }
-
   function leaveTraverse() {
+    cancelTraverseLongPress();
     traverse = null;
     renderHome();
     showScreen('#homeScreen');
@@ -1079,6 +1663,7 @@
   $('#traverseButton').addEventListener('click', startTraverse);
   $('#restartTraverseButton').addEventListener('click', startTraverse);
   $('#traverseHomeButton').addEventListener('click', leaveTraverse);
+  $('#traverseClueButton').addEventListener('click', toggleTraverseClue);
   $('#retryButton').addEventListener('click', () => {
     $('#deathScreen h2').textContent = 'Encontraste una mina.';
     startRun();
@@ -1095,7 +1680,6 @@
   });
   $('#clueItem').addEventListener('pointerdown', beginClueDrag);
   window.addEventListener('focus', checkForUpdate);
-  window.addEventListener('keydown', handleTraverseKeydown);
   setInterval(checkForUpdate, 60000);
 
   $('#versionLabel').textContent = `v${VERSION}`;
