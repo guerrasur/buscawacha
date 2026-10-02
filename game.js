@@ -1,9 +1,15 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.5';
+  const VERSION = '0.1.6';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const LONG_PRESS_MS = 430;
+  const FLOOR_TYPES = {
+    safe: { id: 'safe', name: 'Piso seguro', rewardChance: 0.10, rewardQuality: 'Baja', densityDelta: -0.035, cellDelta: 5, mineDamage: 1 },
+    normal: { id: 'normal', name: 'Piso normal', rewardChance: 0.40, rewardQuality: 'Normal', densityDelta: 0, cellDelta: 0, mineDamage: 1 },
+    dangerous: { id: 'dangerous', name: 'Piso peligroso', rewardChance: 1.00, rewardQuality: 'Normal', densityDelta: 0.035, cellDelta: -2, mineDamage: 1 },
+    heavy: { id: 'heavy', name: 'Piso pesado', rewardChance: 0.65, rewardQuality: 'Alta', densityDelta: 0.012, cellDelta: 0, mineDamage: 2 }
+  };
   const SHAPE_UNLOCKS = [
     { id: 'room', name: 'Sala', at: 0 },
     { id: 'cross', name: 'Cruz', at: 0 },
@@ -64,35 +70,42 @@
     profile.runs += 1;
     saveProfile();
     run = { floor: 1, cleared: 0, shields: 0, shieldCapacity: 1, rewardClaimedFloor: 0, pendingReward: null, startedAt: Date.now() };
-    startFloor(makeFloorSpec(1, null));
+    startFloor(makeFloorSpec(1, null, 'normal'));
   }
 
-  function makeFloorSpec(floor, bias) {
+  function makeFloorSpec(floor, bias, floorTypeId = 'normal') {
     const shapes = unlockedShapes();
     const shape = shapes[Math.floor(Math.random() * shapes.length)];
     const difficulty = Math.max(1, floor);
+    const floorType = FLOOR_TYPES[floorTypeId] || FLOOR_TYPES.normal;
     const baseCells = Math.min(104, 25 + difficulty * 4);
     const densityBase = Math.min(0.32, 0.12 + (difficulty - 1) * 0.018);
-    let density = densityBase;
-    let targetCells = baseCells;
+    let density = clamp(densityBase + floorType.densityDelta, 0.08, 0.38);
+    let targetCells = Math.max(20, baseCells + floorType.cellDelta);
     let trait = 'Equilibrado';
 
     if (bias === 'safe') {
-      density = Math.max(0.11, densityBase - 0.025);
-      targetCells = Math.min(82, baseCells + 6);
+      targetCells = Math.min(92, targetCells + 6);
       trait = 'Más abierto';
     } else if (bias === 'dense') {
-      density = Math.min(0.245, densityBase + 0.025);
-      targetCells = Math.max(22, baseCells - 4);
+      density = Math.min(0.38, density + 0.012);
+      targetCells = Math.max(22, targetCells - 4);
       trait = 'Más denso';
     } else if (bias === 'long') {
-      targetCells = Math.min(84, baseCells + 10);
+      targetCells = Math.min(96, targetCells + 10);
       trait = 'Más largo';
     }
 
     const maxSide = Math.min(13, 7 + Math.floor((difficulty - 1) / 2));
     const dims = dimensionsForShape(shape.id, maxSide, targetCells);
-    return { floor, difficulty, shapeId: shape.id, shapeName: shape.name, density, targetCells, rows: dims.rows, cols: dims.cols, trait };
+    return {
+      floor, difficulty, shapeId: shape.id, shapeName: shape.name, density, targetCells,
+      rows: dims.rows, cols: dims.cols, trait,
+      floorTypeId: floorType.id, floorTypeName: floorType.name,
+      rewardChance: floorType.rewardChance, rewardQuality: floorType.rewardQuality,
+      mineDamage: floorType.mineDamage,
+      mineCountEstimate: Math.max(3, Math.round(targetCells * density))
+    };
   }
 
   function dimensionsForShape(shapeId, maxSide, targetCells) {
@@ -112,7 +125,9 @@
     $('#mineLabel').textContent = board.mineCount;
     $('#difficultyLabel').textContent = spec.difficulty;
     updateShieldLabel();
-    $('#gameHint').textContent = 'Toque: revelar · Mantener: bandera';
+    $('#gameHint').textContent = spec.mineDamage > 1
+      ? 'Piso pesado: cada mina quita 2 escudos · Toque: revelar · Mantener: bandera'
+      : 'Toque: revelar · Mantener: bandera';
     renderBoard();
   }
 
@@ -267,49 +282,20 @@
     if (cell.revealed) {
       btn.classList.add('revealed');
       if (cell.mine) {
-        btn.classList.add('mine');
-        btn.textContent = '✹';
-        btn.setAttribute('aria-label', 'Mina');
-      } else if (cell.number > 0) {
-        btn.textContent = cell.number;
-        btn.classList.add(`n${cell.number}`);
-        btn.setAttribute('aria-label', `${cell.number} minas alrededor`);
-      } else {
-        btn.setAttribute('aria-label', 'Vacía');
-      }
-    } else if (cell.flagged) {
-      btn.classList.add('flagged');
-      btn.textContent = '⚑';
-      btn.setAttribute('aria-label', 'Marcada con bandera');
-    }
-  }
-
-  function repaintCell(cell) {
-    const btn = $(`.cell[data-key="${cell.key}"]`);
-    if (btn) paintCell(btn, cell);
-  }
-
-  function handleCellAction(cell) {
-    if (!cell.active || cell.revealed || board.ended) return;
-    reveal(cell);
-  }
-
-  function reveal(cell) {
-    if (cell.flagged || cell.revealed || board.ended) return;
-    if (!board.minesPlaced) placeMines(cell);
-    cell.revealed = true;
-    repaintCell(cell);
-
-    if (cell.mine) {
-      if (run.shields > 0) {
-        run.shields -= 1;
+      const mineDamage = Math.max(1, board.spec.mineDamage || 1);
+      if (run.shields >= mineDamage) {
+        run.shields -= mineDamage;
         updateShieldLabel();
-        const hitButton = $(`.cell[data-key="${cell.key}"]`);
+        const hitButton = document.querySelector('.cell[data-key="' + cell.key + '"]');
         if (hitButton) hitButton.classList.add('shielded-hit');
-        $('#gameHint').textContent = 'Escudo consumido. La run continúa.';
+        $('#gameHint').textContent = mineDamage === 2
+          ? 'Mina pesada: 2 escudos consumidos. La run continúa.'
+          : 'Escudo consumido. La run continúa.';
         if ('vibrate' in navigator) { try { navigator.vibrate([35, 45, 35]); } catch {} }
         return;
       }
+      run.shields = 0;
+      updateShieldLabel();
       loseRun(cell);
       return;
     }
@@ -369,8 +355,20 @@
 
   function rollFloorReward() {
     if (run.floor === 1) return 'shield';
-    const pool = ['none', 'capacity'];
-    if (run.shields < run.shieldCapacity) pool.push('shield');
+
+    const chance = board?.spec?.rewardChance ?? FLOOR_TYPES.normal.rewardChance;
+    if (Math.random() >= chance) return 'none';
+
+    const quality = board?.spec?.rewardQuality || 'Normal';
+    const canTakeShield = run.shields < run.shieldCapacity;
+    let pool;
+    if (quality === 'Alta') {
+      pool = canTakeShield ? ['capacity', 'capacity', 'shield'] : ['capacity'];
+    } else if (quality === 'Baja') {
+      pool = canTakeShield ? ['shield', 'shield', 'capacity'] : ['capacity'];
+    } else {
+      pool = canTakeShield ? ['shield', 'capacity'] : ['capacity'];
+    }
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
@@ -429,6 +427,16 @@
     setTimeout(showChoices, 180);
   }
 
+  function chooseFloorTypes(nextFloor) {
+    const weighted = nextFloor < 3
+      ? ['safe', 'safe', 'normal', 'normal', 'normal', 'dangerous']
+      : ['safe', 'safe', 'normal', 'normal', 'normal', 'dangerous', 'dangerous', 'heavy', 'heavy'];
+    const first = weighted[Math.floor(Math.random() * weighted.length)];
+    const remaining = weighted.filter(id => id !== first);
+    const second = remaining[Math.floor(Math.random() * remaining.length)] || (first === 'normal' ? 'safe' : 'normal');
+    return [first, second];
+  }
+
   function showChoices() {
     showScreen('#choiceScreen');
     $('#clearedFloorLabel').textContent = run.floor;
@@ -436,14 +444,27 @@
     $('#rewardStep').classList.remove('hidden');
     $('#pathStep').classList.add('hidden');
     renderFloorReward();
+
+    const nextFloor = run.floor + 1;
     const biases = shuffle(['safe', 'dense', 'long']).slice(0, 2);
-    pendingChoices = biases.map(bias => makeFloorSpec(run.floor + 1, bias));
+    const floorTypes = chooseFloorTypes(nextFloor);
+    pendingChoices = floorTypes.map((typeId, i) => makeFloorSpec(nextFloor, biases[i], typeId));
+
     $('#choiceList').innerHTML = '';
     pendingChoices.forEach(choice => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'choice-card';
-      btn.textContent = choice.shapeName;
+      const chance = Math.round(choice.rewardChance * 100);
+      const mineRule = choice.mineDamage > 1
+        ? 'Cada mina quita 2 escudos'
+        : 'Minas aprox.: ' + choice.mineCountEstimate;
+      btn.innerHTML =
+        '<strong>' + choice.floorTypeName + '</strong>' +
+        '<span>' + choice.shapeName + ' · ' + choice.trait + '</span>' +
+        '<span>' + mineRule + '</span>' +
+        '<span>Prob. recompensa: ' + chance + '%</span>' +
+        '<span>Calidad: ' + choice.rewardQuality + '</span>';
       btn.addEventListener('click', () => {
         run.floor += 1;
         startFloor(choice);
