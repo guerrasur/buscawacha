@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.1.1**.
+Versión base: **v0.1.2**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -58,9 +58,9 @@ Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidade
 El celular es la plataforma principal.
 
 - No depender de hover.
-- Tap revela en modo Revelar.
-- Tap marca/desmarca en modo Bandera.
-- Mantener pulsado una casilla también alterna bandera.
+- Tap corto siempre revela una casilla.
+- Mantener pulsada una casilla alterna su bandera.
+- No usar un selector de modo Revelar/Bandera en la interfaz.
 - Evitar scroll horizontal.
 - El tablero debe entrar en el ancho del viewport.
 - La barra superior debe ser compacta.
@@ -107,7 +107,7 @@ Antes de publicar:
 2. Incrementar versión cuando cambia comportamiento o contenido jugable.
 3. Mantener compatibilidad con `buscawacha-profile-v1`, incluyendo ecos y muertes, o migrarla deliberadamente.
 4. Verificar primer toque seguro.
-5. Verificar banderas por botón y long press.
+5. Verificar tap corto para revelar y long press para poner/sacar bandera.
 6. Verificar expansión de ceros.
 7. Verificar victoria al revelar todas las no-minas.
 8. Verificar muerte al tocar mina y acreditación de ecos pendientes.
