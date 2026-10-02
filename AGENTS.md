@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.2.0**.
+Versión base: **v0.3.0**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -60,19 +60,33 @@ Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidade
 
 ## Travesía (prototipo)
 
-Modo experimental separado del Buscaminas clásico. No reutilizar sus reglas para cambiar el modo principal.
+Modo experimental separado del Buscaminas clásico. No reutilizar sus reglas para cambiar el modo principal sin un pedido explícito.
 
-- Tablero rectangular configurable mediante `TRAVERSE_COLS`, `TRAVERSE_ROWS` y `TRAVERSE_MINES`.
-- Valores iniciales: 10 × 12, 18 minas.
-- Se empieza en el centro de la fila inferior; toda esa fila queda libre de minas.
-- El objetivo es llegar a cualquier casilla de la fila superior.
-- Movimiento ortogonal de una casilla por turno, por toque/clic adyacente o flechas del teclado.
-- Sólo se revela la casilla que el jugador pisa; no hay expansión de ceros, banderas, objetos ni temporizador.
-- Las casillas visitadas conservan el número de minas en sus 8 vecinas.
-- La generación verifica que exista al menos un camino libre hasta arriba y regenera si hace falta.
-- Entrar en una mina termina la partida y muestra todas las minas.
-- Este modo no modifica perfil, ecos, desbloqueos ni progreso del modo clásico.
-- Mantenerlo deliberadamente sin estética, animaciones ni audio mientras se prueba la mecánica.
+NEXO de Travesía: **el Buscaminas es el sistema de navegación de una mazmorra**. No se limpia necesariamente todo el mapa y no hay un personaje que se desplace casilla por casilla. El territorio seguro revelado representa hasta dónde llegó la exploración.
+
+Reglas actuales:
+- Tablero base configurable de 11 × 13, pero con celdas inactivas que forman siluetas irregulares.
+- Geometrías actuales: Caverna, Pasillos y Salas rotas.
+- Se entra por una casilla segura en la fila inferior.
+- Sólo se puede abrir una casilla cubierta si está conectada ortogonalmente con territorio seguro ya revelado.
+- Los números conservan la regla clásica: cuentan minas en las 8 vecinas activas.
+- Los ceros expanden automáticamente como en Buscaminas. La expansión no entra automáticamente en puertas ni recompensas: esas decisiones deben ser deliberadas.
+- Mantener pulsado pone o saca bandera; clic derecho también funciona en PC.
+- Una mina termina la travesía salvo que haya un escudo disponible. Un escudo absorbe una mina y esa casilla queda bloqueada.
+- La fila superior tiene dos puertas visibles, A y B. Cada una anuncia el tipo del siguiente piso (Seguro, Normal o Peligroso) y sus condiciones generales.
+- Una puerta sólo puede elegirse cuando el territorio revelado llega hasta ella. Entrar por una puerta genera el siguiente piso conservando escudos, detectores y rescates.
+- Las recompensas aparecen físicamente dentro del tablero y son visibles desde el inicio para permitir desvíos deliberados.
+- `S`: escudo.
+- `?`: detector consumible. Al activarlo sobre una casilla de frontera informa si es mina o segura; una mina queda marcada.
+- `R`: rescate opcional inspirado en Mined-Out. Suma al contador de rescates y funciona como objetivo secundario.
+- Como referencia adicional a Mined-Out, cada casilla abierta manualmente informa también `Detector 4`: cantidad de minas en sus cuatro vecinas ortogonales. Es información extra; el número dibujado en la casilla sigue contando las 8 vecinas.
+- Las recompensas se colocan buscando desvíos respecto de la ruta directa a una puerta, para que explorar de más sea una decisión espacial.
+- La generación valida con un solver básico que ambas puertas y los objetivos colocados puedan alcanzarse mediante deducciones normales de Buscaminas desde la entrada. Si una distribución obliga a adivinar, se regenera.
+- Existe un fallback de generación que reserva corredores seguros y sus halos para evitar bloquear el prototipo si no se encuentra una distribución válida.
+- El modo no modifica perfil, ecos, desbloqueos ni progreso del modo clásico.
+- Mantenerlo deliberadamente sin animaciones, audio ni polish visual mientras se prueba la mecánica.
+
+Pregunta de diseño de este modo: **¿es divertido usar reglas de Buscaminas para elegir rutas, desviarse por recompensas y decidir por qué puerta continuar?**
 
 ## Modo developer
 
