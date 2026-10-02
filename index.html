@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.1.2">
+  <link rel="stylesheet" href="styles.css?v=0.1.3">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.1.2</span>
+        <span id="versionLabel">v0.1.3</span>
       </div>
       <button id="updateButton" class="update-button hidden" type="button">Actualizar</button>
     </header>
@@ -21,7 +21,7 @@
     <main>
       <section id="homeScreen" class="screen">
         <h1>Buscaminas, piso por piso.</h1>
-        <p class="lead">Completá un tablero para descender. Pisá una mina y la run termina.</p>
+        <p class="lead">Completá un tablero para descender. Pisá una mina sin escudos y la run termina.</p>
         <div id="homeStats" class="stats"></div>
         <button id="startButton" class="primary" type="button">Nueva run</button>
         <details class="howto">
@@ -35,6 +35,7 @@
           <div><span>PISO</span><strong id="floorLabel">1</strong></div>
           <div><span>FORMA</span><strong id="shapeLabel">—</strong></div>
           <div><span>MINAS</span><strong id="mineLabel">—</strong></div>
+          <div><span>ESCUDOS</span><strong id="shieldLabel">0</strong></div>
         </div>
 
         <div id="boardWrap" class="board-wrap">
@@ -50,6 +51,7 @@
       <section id="choiceScreen" class="screen hidden">
         <p class="eyebrow">PISO <span id="clearedFloorLabel">1</span> COMPLETADO</p>
         <h2>Elegí el siguiente descenso.</h2>
+        <button id="claimShieldButton" class="shield-reward" type="button">Escudo · tocar para reclamar</button>
         <div id="choiceList" class="choice-list"></div>
       </section>
 
@@ -63,6 +65,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.1.2"></script>
+  <script src="game.js?v=0.1.3"></script>
 </body>
 </html>
