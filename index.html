@@ -6,17 +6,35 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.1.8">
+  <link rel="stylesheet" href="styles.css?v=0.1.9">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.1.8</span>
+        <span id="versionLabel">v0.1.9</span>
       </div>
-      <button id="updateButton" class="update-button hidden" type="button">Actualizar</button>
+      <div class="topbar-actions">
+        <button id="devToggleButton" class="dev-toggle" type="button" aria-expanded="false" aria-controls="devPanel">DEV</button>
+        <button id="updateButton" class="update-button hidden" type="button">Actualizar</button>
+      </div>
     </header>
+
+    <section id="devPanel" class="dev-panel hidden" aria-label="Herramientas de desarrollo">
+      <div class="dev-panel-head">
+        <strong>MODO DEV</strong>
+        <span id="devStatus">Sin run activa</span>
+      </div>
+      <div class="dev-grid">
+        <button type="button" data-dev-action="clue">+ ?</button>
+        <button type="button" data-dev-action="shield">+ escudo</button>
+        <button type="button" data-dev-action="capacity">+ espacio</button>
+        <button type="button" data-dev-action="remove-shield">− escudo</button>
+        <button type="button" data-dev-action="complete">Completar piso</button>
+        <button type="button" data-dev-action="peek">Ver minas</button>
+      </div>
+    </section>
 
     <main>
       <section id="homeScreen" class="screen">
@@ -79,6 +97,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.1.8"></script>
+  <script src="game.js?v=0.1.9"></script>
 </body>
 </html>
