@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.7';
+  const VERSION = '0.1.8';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const LONG_PRESS_MS = 430;
   const FLOOR_TYPES = {
@@ -28,6 +28,8 @@
   let latestVersion = VERSION;
   let longPressTimer = null;
   let longPressTriggered = false;
+  let clueSelection = null;
+  let clueDrag = null;
 
   function loadProfile() {
     try {
@@ -69,7 +71,7 @@
   function startRun() {
     profile.runs += 1;
     saveProfile();
-    run = { floor: 1, cleared: 0, shields: 0, shieldCapacity: 1, rewardClaimedFloor: 0, pendingReward: null, startedAt: Date.now() };
+    run = { floor: 1, cleared: 0, shields: 0, shieldCapacity: 1, clues: 0, rewardClaimedFloor: 0, pendingReward: null, startedAt: Date.now() };
     startFloor(makeFloorSpec(1, null, 'normal'));
   }
 
@@ -124,7 +126,9 @@
     $('#shapeLabel').textContent = spec.shapeName;
     $('#mineLabel').textContent = board.mineCount;
     $('#difficultyLabel').textContent = spec.difficulty;
+    clueSelection = null;
     updateShieldLabel();
+    updateClueUI();
     $('#gameHint').textContent = spec.mineDamage > 1
       ? 'Piso pesado: cada mina quita 2 escudos · Toque: revelar · Mantener: bandera'
       : 'Toque: revelar · Mantener: bandera';
@@ -138,7 +142,7 @@
     for (let r = 0; r < spec.rows; r++) {
       for (let c = 0; c < spec.cols; c++) {
         const key = keyOf(r, c);
-        cells.push({ r, c, key, active: active.has(key), mine: false, revealed: false, flagged: false, number: 0 });
+        cells.push({ r, c, key, active: active.has(key), mine: false, revealed: false, flagged: false, number: 0, clueResult: null });
       }
     }
     return { spec, cells, mineCount, minesPlaced: false, ended: false };
@@ -292,6 +296,14 @@
       } else {
         btn.setAttribute('aria-label', 'Vacía');
       }
+    } else if (cell.clueResult === 'mine') {
+      btn.classList.add('clue-known-mine');
+      btn.textContent = '!';
+      btn.setAttribute('aria-label', 'La pista indicó una mina');
+    } else if (cell.clueResult === 'safe') {
+      btn.classList.add('clue-known-safe');
+      btn.textContent = '·';
+      btn.setAttribute('aria-label', 'La pista indicó que es segura');
     } else if (cell.flagged) {
       btn.classList.add('flagged');
       btn.textContent = '⚑';
@@ -306,7 +318,106 @@
 
   function handleCellAction(cell) {
     if (!cell.active || cell.revealed || board.ended) return;
+    if (clueSelection) {
+      chooseSecondClueCell(cell);
+      return;
+    }
     reveal(cell);
+  }
+
+  function updateClueUI() {
+    const bar = $('#itemBar');
+    const item = $('#clueItem');
+    const count = $('#clueCount');
+    if (!bar || !item || !count || !run) return;
+    count.textContent = run.clues;
+    bar.classList.toggle('hidden', run.clues <= 0);
+    item.disabled = run.clues <= 0 || !board || board.ended;
+  }
+
+  function beginClueDrag(e) {
+    if (!run || run.clues <= 0 || !board || board.ended) return;
+    e.preventDefault();
+    if (!board.minesPlaced) {
+      $('#gameHint').textContent = 'Revelá una casilla antes de usar la pista.';
+      return;
+    }
+    cancelClueSelection();
+    const ghost = document.createElement('div');
+    ghost.className = 'clue-drag-ghost';
+    ghost.textContent = '?';
+    document.body.appendChild(ghost);
+    clueDrag = { pointerId: e.pointerId, ghost };
+    moveClueDrag(e);
+    window.addEventListener('pointermove', moveClueDrag);
+    window.addEventListener('pointerup', endClueDrag, { once: true });
+    window.addEventListener('pointercancel', cancelClueDrag, { once: true });
+  }
+
+  function moveClueDrag(e) {
+    if (!clueDrag || e.pointerId !== clueDrag.pointerId) return;
+    clueDrag.ghost.style.left = e.clientX + 'px';
+    clueDrag.ghost.style.top = e.clientY + 'px';
+  }
+
+  function endClueDrag(e) {
+    if (!clueDrag || e.pointerId !== clueDrag.pointerId) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.cell');
+    const key = target?.dataset?.key;
+    const cell = key ? board.cells.find(c => c.key === key) : null;
+    cancelClueDrag();
+    if (cell) beginClueSelection(cell);
+  }
+
+  function cancelClueDrag() {
+    window.removeEventListener('pointermove', moveClueDrag);
+    if (clueDrag?.ghost) clueDrag.ghost.remove();
+    clueDrag = null;
+  }
+
+  function beginClueSelection(cell) {
+    if (!run || run.clues <= 0 || !board?.minesPlaced || board.ended) return;
+    if (!cell?.active || cell.revealed) {
+      $('#gameHint').textContent = 'Arrastrá ? sobre una casilla sin revelar.';
+      return;
+    }
+    clueSelection = cell;
+    const btn = $('.cell[data-key="' + cell.key + '"]');
+    if (btn) btn.classList.add('clue-first');
+    $('#gameHint').textContent = 'Pista: elegí una segunda casilla contigua.';
+  }
+
+  function cancelClueSelection() {
+    if (clueSelection) {
+      const btn = $('.cell[data-key="' + clueSelection.key + '"]');
+      if (btn) btn.classList.remove('clue-first');
+    }
+    clueSelection = null;
+  }
+
+  function chooseSecondClueCell(cell) {
+    const first = clueSelection;
+    if (!first || !cell || cell === first) return;
+    const adjacent = neighbors8(first.r, first.c).some(([r, c]) => r === cell.r && c === cell.c);
+    if (!adjacent || !cell.active || cell.revealed) {
+      $('#gameHint').textContent = 'La segunda casilla tiene que estar contigua y sin revelar.';
+      return;
+    }
+
+    first.clueResult = first.mine ? 'mine' : 'safe';
+    cell.clueResult = cell.mine ? 'mine' : 'safe';
+    run.clues = Math.max(0, run.clues - 1);
+    cancelClueSelection();
+    repaintCell(first);
+    repaintCell(cell);
+    updateClueUI();
+
+    const mines = Number(first.mine) + Number(cell.mine);
+    $('#gameHint').textContent = mines === 1
+      ? 'Pista usada: la mina quedó marcada con !.'
+      : mines === 0
+        ? 'Pista usada: ninguna de las dos tiene mina.'
+        : 'Pista usada: las dos tienen mina.';
   }
 
   function reveal(cell) {
@@ -395,13 +506,25 @@
 
     const quality = board?.spec?.rewardQuality || 'Normal';
     const canTakeShield = run.shields < run.shieldCapacity;
+    const vulnerable = run.shields === 0 && canTakeShield;
     let pool;
-    if (quality === 'Alta') {
-      pool = canTakeShield ? ['capacity', 'capacity', 'shield'] : ['capacity'];
+
+    if (vulnerable) {
+      if (quality === 'Alta') pool = ['shield', 'shield', 'capacity', 'capacity', 'clue'];
+      else if (quality === 'Baja') pool = ['shield', 'shield', 'shield', 'capacity', 'clue'];
+      else pool = ['shield', 'shield', 'capacity', 'clue'];
+    } else if (quality === 'Alta') {
+      pool = canTakeShield
+        ? ['capacity', 'capacity', 'shield', 'clue', 'clue']
+        : ['capacity', 'capacity', 'clue', 'clue'];
     } else if (quality === 'Baja') {
-      pool = canTakeShield ? ['shield', 'shield', 'capacity'] : ['capacity'];
+      pool = canTakeShield
+        ? ['shield', 'shield', 'capacity', 'clue']
+        : ['capacity', 'clue', 'clue'];
     } else {
-      pool = canTakeShield ? ['shield', 'capacity'] : ['capacity'];
+      pool = canTakeShield
+        ? ['shield', 'capacity', 'clue']
+        : ['capacity', 'clue'];
     }
     return pool[Math.floor(Math.random() * pool.length)];
   }
@@ -419,6 +542,9 @@
       skip.textContent = 'Seguir sin escudo';
     } else if (run.pendingReward === 'capacity') {
       claim.textContent = '+1 espacio de escudo';
+    } else if (run.pendingReward === 'clue') {
+      claim.textContent = '? · pista';
+      skip.textContent = 'Seguir sin objeto';
     } else {
       claim.classList.add('hidden');
       skip.textContent = 'Seguir';
@@ -433,10 +559,13 @@
       run.shields += 1;
     } else if (run.pendingReward === 'capacity') {
       run.shieldCapacity += 1;
+    } else if (run.pendingReward === 'clue') {
+      run.clues += 1;
     }
 
     run.pendingReward = null;
     updateShieldLabel();
+    updateClueUI();
     showPathChoices();
   }
 
@@ -619,6 +748,7 @@
   $('#claimShieldButton').addEventListener('click', claimFloorReward);
   $('#skipShieldButton').addEventListener('click', skipFloorReward);
   $('#updateButton').addEventListener('click', installLatestVersion);
+  $('#clueItem').addEventListener('pointerdown', beginClueDrag);
   window.addEventListener('focus', checkForUpdate);
   setInterval(checkForUpdate, 60000);
 
