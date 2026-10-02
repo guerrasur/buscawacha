@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.2';
+  const VERSION = '0.1.3';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const LONG_PRESS_MS = 430;
   const SHAPE_UNLOCKS = [
@@ -63,7 +63,7 @@
   function startRun() {
     profile.runs += 1;
     saveProfile();
-    run = { floor: 1, cleared: 0, startedAt: Date.now() };
+    run = { floor: 1, cleared: 0, shields: 0, rewardClaimedFloor: 0, startedAt: Date.now() };
     startFloor(makeFloorSpec(1, null));
   }
 
@@ -109,6 +109,7 @@
     $('#floorLabel').textContent = spec.floor;
     $('#shapeLabel').textContent = spec.shapeName;
     $('#mineLabel').textContent = board.mineCount;
+    updateShieldLabel();
     $('#gameHint').textContent = 'Toque: revelar · Mantener: bandera';
     renderBoard();
   }
@@ -298,6 +299,15 @@
     repaintCell(cell);
 
     if (cell.mine) {
+      if (run.shields > 0) {
+        run.shields -= 1;
+        updateShieldLabel();
+        const hitButton = $(`.cell[data-key="${cell.key}"]`);
+        if (hitButton) hitButton.classList.add('shielded-hit');
+        $('#gameHint').textContent = 'Escudo consumido. La run continúa.';
+        if ('vibrate' in navigator) { try { navigator.vibrate([35, 45, 35]); } catch {} }
+        return;
+      }
       loseRun(cell);
       return;
     }
@@ -350,6 +360,24 @@
     return board.cells.every(c => !c.active || c.mine || c.revealed);
   }
 
+  function updateShieldLabel() {
+    const label = $('#shieldLabel');
+    if (label) label.textContent = run ? run.shields : 0;
+  }
+
+  function claimFloorShield() {
+    if (!run || run.rewardClaimedFloor === run.floor) return;
+    run.rewardClaimedFloor = run.floor;
+    run.shields += 1;
+    updateShieldLabel();
+    const button = $('#claimShieldButton');
+    if (button) {
+      button.disabled = true;
+      button.textContent = `Escudo reclamado · ${run.shields}`;
+      button.classList.add('claimed');
+    }
+  }
+
   function completeFloor() {
     if (board.ended) return;
     board.ended = true;
@@ -362,6 +390,10 @@
   function showChoices() {
     showScreen('#choiceScreen');
     $('#clearedFloorLabel').textContent = run.floor;
+    const shieldButton = $('#claimShieldButton');
+    shieldButton.disabled = false;
+    shieldButton.textContent = 'Escudo · tocar para reclamar';
+    shieldButton.classList.remove('claimed');
     const biases = shuffle(['safe', 'dense', 'long']).slice(0, 2);
     pendingChoices = biases.map(bias => makeFloorSpec(run.floor + 1, bias));
     $('#choiceList').innerHTML = '';
@@ -489,6 +521,7 @@
   });
   $('#homeButton').addEventListener('click', () => { renderHome(); showScreen('#homeScreen'); });
   $('#restartRunButton').addEventListener('click', abandonRun);
+  $('#claimShieldButton').addEventListener('click', claimFloorShield);
   $('#updateButton').addEventListener('click', installLatestVersion);
   window.addEventListener('focus', checkForUpdate);
   setInterval(checkForUpdate, 60000);
