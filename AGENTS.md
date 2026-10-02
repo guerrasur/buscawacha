@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.1.6**.
+Versión base: **v0.1.7**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
