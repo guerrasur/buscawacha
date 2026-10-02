@@ -294,6 +294,11 @@
         if (active.has(key)) reserved.add(key);
       });
 
+      const routeTargets = [...doors.map(door => door.key), ...pickups.keys()];
+      routeTargets.forEach(target => {
+        traverseShortestPath(active, start.key, target).forEach(key => reserved.add(key));
+      });
+
       const candidates = [...active].filter(key => !reserved.has(key));
       const density = clamp(floorType.density + Math.min(0.045, (floor - 1) * 0.004), 0.09, 0.23);
       const desiredMineCount = Math.max(4, Math.min(candidates.length, Math.round(active.size * density)));
