@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.1';
+  const VERSION = '0.1.2';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const LONG_PRESS_MS = 430;
   const SHAPE_UNLOCKS = [
@@ -18,7 +18,6 @@
 
   let run = null;
   let board = null;
-  let inputMode = 'reveal';
   let pendingChoices = [];
   let latestVersion = VERSION;
   let longPressTimer = null;
@@ -65,8 +64,6 @@
     profile.runs += 1;
     saveProfile();
     run = { floor: 1, cleared: 0, startedAt: Date.now() };
-    inputMode = 'reveal';
-    updateModeButton();
     startFloor(makeFloorSpec(1, null));
   }
 
@@ -112,7 +109,7 @@
     $('#floorLabel').textContent = spec.floor;
     $('#shapeLabel').textContent = spec.shapeName;
     $('#mineLabel').textContent = board.mineCount;
-    $('#gameHint').textContent = 'Revelá todas las casillas que no tengan minas.';
+    $('#gameHint').textContent = 'Toque: revelar · Mantener: bandera';
     renderBoard();
   }
 
@@ -291,7 +288,6 @@
 
   function handleCellAction(cell) {
     if (!cell.active || cell.revealed || board.ended) return;
-    if (inputMode === 'flag') { toggleFlag(cell); return; }
     reveal(cell);
   }
 
@@ -434,10 +430,6 @@
     }
   }
 
-  function updateModeButton() {
-    $('#modeButton').textContent = inputMode === 'reveal' ? 'Modo: revelar' : 'Modo: bandera';
-  }
-
   function cellAt(r, c) {
     if (!board || r < 0 || c < 0 || r >= board.spec.rows || c >= board.spec.cols) return null;
     return board.cells[r * board.spec.cols + c] || null;
@@ -497,11 +489,6 @@
   });
   $('#homeButton').addEventListener('click', () => { renderHome(); showScreen('#homeScreen'); });
   $('#restartRunButton').addEventListener('click', abandonRun);
-  $('#modeButton').addEventListener('click', () => {
-    inputMode = inputMode === 'reveal' ? 'flag' : 'reveal';
-    updateModeButton();
-    $('#gameHint').textContent = inputMode === 'reveal' ? 'Toque para revelar.' : 'Toque para poner o sacar banderas.';
-  });
   $('#updateButton').addEventListener('click', installLatestVersion);
   window.addEventListener('focus', checkForUpdate);
   setInterval(checkForUpdate, 60000);
