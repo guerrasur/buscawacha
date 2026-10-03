@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const PROFILE_KEY = 'buscawacha-profile-v1';
   const DEV_KEY = 'buscawacha-dev-mode-v1';
   const LONG_PRESS_MS = 430;
@@ -39,6 +39,7 @@
   let run = null;
   let board = null;
   let traverse = null;
+  let traverseFlagDrag = null;
   let traversePressTimer = null;
   let traversePressKey = null;
   let traverseLongPressTriggered = false;
@@ -186,6 +187,8 @@
 
 
   function startTraverse() {
+    cancelTraverseFlagDrag();
+    cancelTraverseLongPress();
     run = null;
     board = null;
     traverse = createTraverseState({
@@ -198,7 +201,9 @@
     renderTraverse();
   }
 
-  function createTraverseState(meta, floorTypeId) {
+  function createTraverseState(meta, floorTypeId, dungeon = null, roomIndex = 0) {
+    // A connected ring with a cross-link gives loops, branches and return routes.
+    dungeon ||= { rooms: [], links: [[1, 5], [0, 2, 4], [1, 3], [2, 4], [3, 5, 1], [4, 0]], hatchRoom: 2 + Math.floor(Math.random() * 3) };
     const rows = TRAVERSE_ROWS;
     const cols = TRAVERSE_COLS;
     const floor = Math.max(1, Number(meta.floor) || 1);
@@ -206,7 +211,16 @@
     const shape = TRAVERSE_SHAPES[Math.floor(Math.random() * TRAVERSE_SHAPES.length)];
     const start = { r: rows - 1, c: Math.floor(cols / 2) };
     start.key = keyOf(start.r, start.c);
-    const doors = makeTraverseDoors(cols, floor + 1);
+    const destinations = dungeon.links[roomIndex];
+    const doors = destinations.map((targetRoom, index) => {
+      const c = Math.round((index + 1) * (cols - 1) / (destinations.length + 1));
+      return { r: 0, c, key: keyOf(0, c), label: String(targetRoom + 1), targetRoom, type: { name: 'Sala ' + (targetRoom + 1), description: 'Mismo piso · ida y vuelta' } };
+    });
+    if (roomIndex === dungeon.hatchRoom) {
+      const c = Math.floor(cols / 2);
+      // The hatch sits inside the room, separate from every room connection.
+      doors.push({ r: 2, c, key: keyOf(2, c), label: '↓', hatch: true, typeId: 'normal', type: { name: 'Compuerta', description: 'Bajar al piso ' + (floor + 1) } });
+    }
     const generated = generateTraverseDungeon(rows, cols, start, doors, shape.id, floorType, floor);
 
     const state = {
@@ -218,6 +232,9 @@
       shapeId: shape.id,
       shapeName: shape.name,
       start,
+      player: start.key,
+      dungeon,
+      roomIndex,
       doors,
       active: generated.active,
       mines: generated.mines,
@@ -234,39 +251,14 @@
       clueArmed: false,
       ended: false,
       revealMines: false,
-      status: 'Abrí camino hasta una puerta.',
+      status: 'Movete a una casilla vecina. Buscá la compuerta.',
       detector: ''
     };
 
     revealTraverseCascade(state, start.key, false);
     state.detector = 'Detector 4: ' + traverseOrthogonalMineCount(state, start.r, start.c);
+    dungeon.rooms[roomIndex] = state;
     return state;
-  }
-
-  function makeTraverseDoors(cols, nextFloor) {
-    const positions = [
-      Math.max(1, Math.floor(cols * 0.23)),
-      Math.min(cols - 2, Math.floor(cols * 0.77))
-    ];
-    const types = chooseTraverseDoorTypes(nextFloor);
-    return positions.map((c, index) => ({
-      r: 0,
-      c,
-      key: keyOf(0, c),
-      label: index === 0 ? 'A' : 'B',
-      typeId: types[index],
-      type: TRAVERSE_FLOOR_TYPES[types[index]]
-    }));
-  }
-
-  function chooseTraverseDoorTypes(nextFloor) {
-    const weighted = nextFloor < 3
-      ? ['safe', 'safe', 'normal', 'normal', 'dangerous']
-      : ['safe', 'normal', 'normal', 'dangerous', 'dangerous'];
-    const first = weighted[Math.floor(Math.random() * weighted.length)];
-    const alternatives = weighted.filter(id => id !== first);
-    const second = alternatives[Math.floor(Math.random() * alternatives.length)] || (first === 'safe' ? 'dangerous' : 'safe');
-    return [first, second];
   }
 
   function generateTraverseDungeon(rows, cols, start, doors, shapeId, floorType, floor) {
@@ -287,7 +279,14 @@
       });
 
       const reserved = new Set([start.key]);
-      doors.forEach(door => reserved.add(door.key));
+      doors.forEach(door => {
+        reserved.add(door.key);
+        // Entering a room always provides a safe landing and readable clues.
+        neighbors8(door.r, door.c).forEach(([r, c]) => {
+          const key = keyOf(r, c);
+          if (active.has(key)) reserved.add(key);
+        });
+      });
       pickups.forEach((_, key) => reserved.add(key));
       neighbors8(start.r, start.c).forEach(([r, c]) => {
         const key = keyOf(r, c);
@@ -670,8 +669,10 @@
   }
 
   function isTraverseFrontier(key) {
-    if (!traverse || traverse.revealed.has(key)) return false;
-    return isTraverseFrontierForSet(traverse.revealed, key);
+    if (!traverse || !traverse.active.has(key) || traverse.hitMines.has(key)) return false;
+    const [r, c] = fromKey(key);
+    const [pr, pc] = fromKey(traverse.player);
+    return Math.max(Math.abs(r - pr), Math.abs(c - pc)) === 1;
   }
 
   function traversePickupAt(key) {
@@ -711,13 +712,14 @@
           btn.classList.add('door');
           if (isTraverseFrontier(door.key)) btn.classList.add('available');
           btn.textContent = door.label;
-          btn.setAttribute('aria-label', 'Puerta ' + door.label + ': ' + door.type.name);
+          btn.setAttribute('aria-label', door.type.name);
+          if (traverse.player === key) btn.classList.add('player');
           btn.addEventListener('click', () => enterTraverseDoor(door));
           root.appendChild(btn);
           continue;
         }
 
-        if (isTraverseFrontier(key) && !revealed) btn.classList.add('frontier');
+        if (isTraverseFrontier(key)) btn.classList.add('frontier');
 
         if (traverse.revealMines && mine) {
           btn.classList.add('mine');
@@ -744,6 +746,11 @@
           btn.textContent = '·';
         }
 
+        btn.setAttribute('aria-label', 'Fila ' + (r + 1) + ', columna ' + (c + 1) + (revealed ? ', ' + traverseNumberAt(traverse, r, c) + ' minas vecinas' : ', cubierta'));
+        if (traverse.player === key) {
+          btn.classList.add('player');
+          btn.setAttribute('aria-label', 'Jugador. ' + btn.getAttribute('aria-label'));
+        }
         btn.addEventListener('click', () => {
           if (traverseLongPressTriggered) {
             traverseLongPressTriggered = false;
@@ -764,7 +771,7 @@
     }
 
     $('#traverseFloorLabel').textContent = traverse.floor;
-    $('#traverseShapeLabel').textContent = traverse.shapeName;
+    $('#traverseShapeLabel').textContent = 'Sala ' + (traverse.roomIndex + 1) + ' · ' + traverse.shapeName;
     $('#traverseMineLabel').textContent = traverse.mineCount;
     $('#traverseShieldLabel').textContent = traverse.shields;
     $('#traverseRescueLabel').textContent = traverse.rescues;
@@ -780,6 +787,7 @@
       legend.appendChild(item);
     });
 
+    $('#traverseFlagItem').disabled = traverse.ended;
     const clueButton = $('#traverseClueButton');
     const clueCount = $('#traverseClueCount');
     clueCount.textContent = traverse.clues;
@@ -791,7 +799,8 @@
   function handleTraverseCell(r, c) {
     if (!traverse || traverse.ended) return;
     const key = keyOf(r, c);
-    if (!traverse.active.has(key) || isTraverseDoorKey(key) || traverse.revealed.has(key)) return;
+    if (!traverse.active.has(key) || traverse.hitMines.has(key) || key === traverse.player) return;
+    if (isTraverseDoorKey(key)) { enterTraverseDoor(traverse.doors.find(door => door.key === key)); return; }
 
     if (traverse.clueArmed) {
       useTraverseClue(key);
@@ -800,7 +809,7 @@
 
     if (traverse.flags.has(key)) return;
     if (!isTraverseFrontier(key)) {
-      traverse.status = 'Sólo podés abrir una casilla conectada al territorio revelado.';
+      traverse.status = 'Movete de a una casilla, también en diagonal.';
       renderTraverse();
       return;
     }
@@ -814,6 +823,7 @@
         traverse.detector = 'Detector 4: —';
         if ('vibrate' in navigator) { try { navigator.vibrate([35, 45, 35]); } catch {} }
       } else {
+        traverse.player = key;
         traverse.ended = true;
         traverse.revealMines = true;
         traverse.status = 'Run terminada: pisaste una mina.';
@@ -826,7 +836,9 @@
     const beforeShield = traverse.shields;
     const beforeClues = traverse.clues;
     const beforeRescues = traverse.rescues;
-    revealTraverseCascade(traverse, key, true);
+    traverse.player = key;
+    revealTraverseCascade(traverse, key, false);
+    collectTraversePickup(traverse, key);
     traverse.detector = 'Detector 4: ' + traverseOrthogonalMineCount(traverse, r, c);
 
     if (traverse.shields > beforeShield) {
@@ -836,7 +848,7 @@
     } else if (traverse.rescues > beforeRescues) {
       traverse.status = 'Rescate completado.';
     } else {
-      traverse.status = 'Seguí abriendo frontera o entrá por una puerta disponible.';
+      traverse.status = 'Sala ' + (traverse.roomIndex + 1) + ': buscá otra sala o la compuerta.';
     }
 
     renderTraverse();
@@ -891,23 +903,81 @@
   function enterTraverseDoor(door) {
     if (!traverse || traverse.ended) return;
     if (!isTraverseFrontier(door.key)) {
-      traverse.status = 'Primero abrí un camino hasta esa puerta.';
+      traverse.status = 'Acercate a esa salida, de a una casilla.';
       renderTraverse();
       return;
     }
-
-    const meta = {
-      floor: traverse.floor + 1,
-      shields: traverse.shields,
-      clues: traverse.clues,
-      rescues: traverse.rescues
-    };
-    traverse = createTraverseState(meta, door.typeId);
+    cancelTraverseLongPress();
+    cancelTraverseFlagDrag();
+    const previous = traverse;
+    const meta = { floor: previous.floor, shields: previous.shields, clues: previous.clues, rescues: previous.rescues };
+    if (door.hatch) {
+      meta.floor += 1;
+      traverse = createTraverseState(meta, door.typeId);
+    } else {
+      const dungeon = previous.dungeon;
+      traverse = dungeon.rooms[door.targetRoom] || createTraverseState(meta, previous.floorTypeId, dungeon, door.targetRoom);
+      // Room exploration persists; inventory belongs to the whole expedition.
+      Object.assign(traverse, { shields: meta.shields, clues: meta.clues, rescues: meta.rescues, clueArmed: false });
+      const entrance = traverse.doors.find(exit => exit.targetRoom === previous.roomIndex);
+      traverse.player = entrance.key;
+      neighbors8(entrance.r, entrance.c).forEach(([r, c]) => {
+        const key = keyOf(r, c);
+        if (traverse.active.has(key) && !traverse.mines.has(key)) revealTraverseCascade(traverse, key, false);
+      });
+      traverse.detector = 'Detector 4: ' + traverseOrthogonalMineCount(traverse, entrance.r, entrance.c);
+      traverse.status = 'Sala ' + (traverse.roomIndex + 1) + '. Podés volver por la salida ' + (previous.roomIndex + 1) + '.';
+    }
     renderTraverse();
   }
 
+  function beginTraverseFlagDrag(event) {
+    if (!traverse || traverse.ended || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    event.preventDefault();
+    cancelTraverseFlagDrag();
+    cancelTraverseLongPress();
+    const ghost = document.createElement('div');
+    ghost.className = 'clue-drag-ghost';
+    ghost.textContent = '⚑';
+    document.body.appendChild(ghost);
+    traverseFlagDrag = { pointerId: event.pointerId, ghost };
+    moveTraverseFlagDrag(event);
+    window.addEventListener('pointermove', moveTraverseFlagDrag);
+    window.addEventListener('pointerup', endTraverseFlagDrag);
+    window.addEventListener('pointercancel', cancelTraverseFlagDrag);
+  }
+
+  function moveTraverseFlagDrag(event) {
+    if (!traverseFlagDrag || event.pointerId !== traverseFlagDrag.pointerId) return;
+    traverseFlagDrag.ghost.style.left = event.clientX + 'px';
+    traverseFlagDrag.ghost.style.top = event.clientY + 'px';
+    document.querySelectorAll('.flag-drop-target').forEach(cell => cell.classList.remove('flag-drop-target'));
+    const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('.traverse-cell');
+    if (cell && canTraverseFlag(cell.dataset.key)) cell.classList.add('flag-drop-target');
+  }
+
+  function endTraverseFlagDrag(event) {
+    if (!traverseFlagDrag || event.pointerId !== traverseFlagDrag.pointerId) return;
+    const key = document.elementFromPoint(event.clientX, event.clientY)?.closest('.traverse-cell')?.dataset.key;
+    cancelTraverseFlagDrag();
+    if (key) toggleTraverseFlag(key);
+  }
+
+  function cancelTraverseFlagDrag() {
+    window.removeEventListener('pointermove', moveTraverseFlagDrag);
+    window.removeEventListener('pointerup', endTraverseFlagDrag);
+    window.removeEventListener('pointercancel', cancelTraverseFlagDrag);
+    traverseFlagDrag?.ghost.remove();
+    traverseFlagDrag = null;
+    document.querySelectorAll('.flag-drop-target').forEach(cell => cell.classList.remove('flag-drop-target'));
+  }
+
+  function canTraverseFlag(key) {
+    return Boolean(traverse && !traverse.ended && traverse.active.has(key) && !traverse.revealed.has(key) && !traverse.hitMines.has(key) && !isTraverseDoorKey(key) && !traverse.knownSafe.has(key) && !traversePickupAt(key));
+  }
+
   function toggleTraverseFlag(key) {
-    if (!traverse || traverse.ended || !traverse.active.has(key) || traverse.revealed.has(key) || isTraverseDoorKey(key)) return;
+    if (!canTraverseFlag(key)) return;
     const pickup = traversePickupAt(key);
     if (pickup && !pickup.collected) return;
     if (traverse.knownSafe.has(key)) return;
@@ -978,6 +1048,7 @@
 
   function leaveTraverse() {
     cancelTraverseLongPress();
+    cancelTraverseFlagDrag();
     traverse = null;
     renderHome();
     showScreen('#homeScreen');
@@ -1696,6 +1767,19 @@
   $('#traverseButton').addEventListener('click', startTraverse);
   $('#restartTraverseButton').addEventListener('click', startTraverse);
   $('#traverseHomeButton').addEventListener('click', leaveTraverse);
+  $('#traverseFlagItem').addEventListener('pointerdown', beginTraverseFlagDrag);
+  document.querySelectorAll('[data-traverse-move]').forEach(button => button.addEventListener('click', () => moveTraversePlayer(button.dataset.traverseMove)));
+  window.addEventListener('keydown', event => {
+    if (!traverse || traverse.ended || $('#traverseScreen').classList.contains('hidden') || /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+    const directions = { ArrowUp: '-1,0', ArrowDown: '1,0', ArrowLeft: '0,-1', ArrowRight: '0,1', q: '-1,-1', w: '-1,0', e: '-1,1', a: '0,-1', d: '0,1', z: '1,-1', x: '1,0', c: '1,1' };
+    if (directions[event.key]) { event.preventDefault(); moveTraversePlayer(directions[event.key]); }
+  });
+  function moveTraversePlayer(direction) {
+    if (!traverse || traverse.ended) return;
+    const [dr, dc] = fromKey(direction);
+    const [r, c] = fromKey(traverse.player);
+    handleTraverseCell(r + dr, c + dc);
+  }
   $('#traverseClueButton').addEventListener('click', toggleTraverseClue);
   $('#retryButton').addEventListener('click', () => {
     $('#deathScreen h2').textContent = 'Encontraste una mina.';

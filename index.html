@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f4f4f4">
   <meta name="description" content="Prototipo mobile-first de Buscaminas roguelite.">
   <title>Buscawacha</title>
-  <link rel="stylesheet" href="styles.css?v=0.3.0">
+  <link rel="stylesheet" href="styles.css?v=0.4.0">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <strong>BUSCAWACHA</strong>
-        <span id="versionLabel">v0.3.0</span>
+        <span id="versionLabel">v0.4.0</span>
       </div>
       <div class="topbar-actions">
         <button id="devToggleButton" class="dev-toggle" type="button" aria-expanded="false" aria-controls="devPanel">DEV</button>
@@ -58,7 +58,7 @@
           <div><span>RESCATES</span><strong id="traverseRescueLabel">0</strong></div>
         </div>
 
-        <p id="traverseStatus" class="traverse-status">Abrí camino hasta una puerta.</p>
+        <p id="traverseStatus" class="traverse-status">Movete a una casilla vecina. Buscá la compuerta.</p>
         <p id="traverseDetector" class="traverse-detector">Detector 4: —</p>
 
         <div class="traverse-board-wrap">
@@ -68,12 +68,18 @@
         <div id="traverseDoorLegend" class="traverse-door-legend" aria-label="Salidas"></div>
 
         <div class="traverse-item-controls">
+          <button id="traverseFlagItem" class="traverse-clue flag-item" type="button" aria-label="Arrastrar bandera para marcar o desmarcar" title="Arrastrar para poner o sacar una bandera">⚑</button>
           <button id="traverseClueButton" class="traverse-clue hidden" type="button">
             ? <small id="traverseClueCount">0</small>
           </button>
         </div>
 
-        <p class="hint">Toque: abrir frontera · Mantener: bandera · S/R/? son objetivos seguros</p>
+        <div class="traverse-movement" aria-label="Mover jugador">
+          <button data-traverse-move="-1,-1" aria-label="Arriba izquierda">↖</button><button data-traverse-move="-1,0" aria-label="Arriba">↑</button><button data-traverse-move="-1,1" aria-label="Arriba derecha">↗</button>
+          <button data-traverse-move="0,-1" aria-label="Izquierda">←</button><span>●</span><button data-traverse-move="0,1" aria-label="Derecha">→</button>
+          <button data-traverse-move="1,-1" aria-label="Abajo izquierda">↙</button><button data-traverse-move="1,0" aria-label="Abajo">↓</button><button data-traverse-move="1,1" aria-label="Abajo derecha">↘</button>
+        </div>
+        <p class="hint">● Jugador · Tocá una vecina para moverte · Arrastrá ⚑ para marcar o desmarcar · ↓ Compuerta</p>
 
         <div class="traverse-controls">
           <button id="restartTraverseButton" class="secondary" type="button">Nueva travesía</button>
@@ -128,6 +134,6 @@
       </section>
     </main>
   </div>
-  <script src="game.js?v=0.3.0"></script>
+  <script src="game.js?v=0.4.0"></script>
 </body>
 </html>

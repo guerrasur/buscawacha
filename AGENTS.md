@@ -4,7 +4,7 @@
 
 Buscawacha es un prototipo mobile-first de Buscaminas roguelite. Su objetivo actual NO es verse terminado: es comprobar si el loop de Buscaminas + pisos + mapas irregulares + elección de descenso resulta divertido.
 
-Versión base: **v0.3.0**.
+Versión base: **v0.4.0**.
 GitHub Pages publica desde `main`.
 Arquitectura: sitio estático sin build ni backend (`index.html`, `styles.css`, `game.js`, `version.json`).
 
@@ -62,31 +62,27 @@ Los desbloqueos habilitan nuevas geometrías. No deben mejorar las probabilidade
 
 Modo experimental separado del Buscaminas clásico. No reutilizar sus reglas para cambiar el modo principal sin un pedido explícito.
 
-NEXO de Travesía: **el Buscaminas es el sistema de navegación de una mazmorra**. No se limpia necesariamente todo el mapa y no hay un personaje que se desplace casilla por casilla. El territorio seguro revelado representa hasta dónde llegó la exploración.
+NEXO de Travesía: **un jugador ubicado en una casilla recorre una mazmorra mediante el sistema de minas del Buscaminas**.
 
 Reglas actuales:
-- Tablero base configurable de 11 × 13, pero con celdas inactivas que forman siluetas irregulares.
-- Geometrías actuales: Caverna, Pasillos y Salas rotas.
-- Se entra por una casilla segura en la fila inferior.
-- Sólo se puede abrir una casilla cubierta si está conectada ortogonalmente con territorio seguro ya revelado.
-- Los números conservan la regla clásica: cuentan minas en las 8 vecinas activas.
-- Los ceros expanden automáticamente como en Buscaminas. La expansión no entra automáticamente en puertas ni recompensas: esas decisiones deben ser deliberadas.
-- Mantener pulsado pone o saca bandera; clic derecho también funciona en PC.
-- Una mina termina la travesía salvo que haya un escudo disponible. Un escudo absorbe una mina y esa casilla queda bloqueada.
-- La fila superior tiene dos puertas visibles, A y B. Cada una anuncia el tipo del siguiente piso (Seguro, Normal o Peligroso) y sus condiciones generales.
-- Una puerta sólo puede elegirse cuando el territorio revelado llega hasta ella. Entrar por una puerta genera el siguiente piso conservando escudos, detectores y rescates.
-- Las recompensas aparecen físicamente dentro del tablero y son visibles desde el inicio para permitir desvíos deliberados.
-- `S`: escudo.
-- `?`: detector consumible. Al activarlo sobre una casilla de frontera informa si es mina o segura; una mina queda marcada.
-- `R`: rescate opcional inspirado en Mined-Out. Suma al contador de rescates y funciona como objetivo secundario.
-- Como referencia adicional a Mined-Out, cada casilla abierta manualmente informa también `Detector 4`: cantidad de minas en sus cuatro vecinas ortogonales. Es información extra; el número dibujado en la casilla sigue contando las 8 vecinas.
-- Las recompensas se colocan buscando desvíos respecto de la ruta directa a una puerta, para que explorar de más sea una decisión espacial.
-- La generación valida con un solver básico que ambas puertas y los objetivos colocados puedan alcanzarse mediante deducciones normales de Buscaminas desde la entrada. Si una distribución obliga a adivinar, se regenera.
-- Existe un fallback de generación que reserva corredores seguros y sus halos para evitar bloquear el prototipo si no se encuentra una distribución válida.
-- El modo no modifica perfil, ecos, desbloqueos ni progreso del modo clásico.
-- Mantenerlo deliberadamente sin animaciones, audio ni polish visual mientras se prueba la mecánica.
+- Cada piso tiene seis salas conectadas en un circuito con una conexión transversal: hay bifurcaciones, distintos caminos y regreso a salas anteriores.
+- Cada sala conserva la geometría irregular de Caverna, Pasillos o Salas rotas, en una grilla configurable de 11 × 13.
+- Las salas se generan al visitarlas y conservan minas, números, casillas reveladas, banderas y objetos recogidos durante todo el piso.
+- El jugador tiene una posición explícita, marcada con `●`. Sólo puede moverse a una casilla vecina activa, en ocho direcciones, incluidas diagonales.
+- Tap sobre una vecina, controles de ocho direcciones, flechas y QWE/AD/ZXC permiten moverse. Las casillas reveladas pueden recorrerse de nuevo. Revelar ceros no desplaza al jugador.
+- Los números cuentan minas en las ocho vecinas activas. Los ceros expanden automáticamente, sin abrir salidas ni recoger objetos remotos.
+- Las salidas numeradas conectan con otra sala del mismo piso. Se atraviesan sólo desde una posición vecina. Al volver se ingresa por la conexión correspondiente.
+- Una sala aleatoria contiene la compuerta `↓`. Sólo atravesarla genera el siguiente piso. No se exige limpiar todas las casillas ni completar salas.
+- La entrada inicial y las llegadas a salas son seguras. La generación mantiene rutas conectadas y valida deducciones de Buscaminas hasta salidas y objetos.
+- Una mina termina la travesía salvo que haya un escudo disponible. El escudo se consume y la casilla con mina queda bloqueada; el jugador permanece en su posición anterior.
+- La bandera `⚑` se muestra centrada debajo del mapa y se arrastra con Pointer Events, como los objetos del modo principal. Soltarla en una casilla cubierta válida pone o saca una bandera; no se consume. Hay fantasma y resaltado de destino. Soltar fuera o cancelar no modifica el mapa y limpia los listeners.
+- Mantener pulsado y clic derecho también ponen o sacan banderas. Una bandera bloquea el desplazamiento hasta quitarla.
+- `S`: escudo; `?`: detector consumible; `R`: rescate opcional. Se recogen sólo al pisar su casilla. El inventario se comparte entre salas y se conserva al bajar de piso.
+- El detector `?` comprueba una casilla cubierta adyacente al jugador. `Detector 4` informa minas en las cuatro vecinas ortogonales de la posición.
+- Este modo no modifica perfil, ecos, desbloqueos ni progreso del modo clásico.
+- Mantener la estética de prototipo, sin audio ni animaciones elaboradas.
 
-Pregunta de diseño de este modo: **¿es divertido usar reglas de Buscaminas para elegir rutas, desviarse por recompensas y decidir por qué puerta continuar?**
+Pregunta de diseño: **¿es divertido recorrer salas, deducir minas, explorar desvíos y buscar la compuerta?**
 
 ## Modo developer
 
